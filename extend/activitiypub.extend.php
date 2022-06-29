@@ -1,7 +1,7 @@
 <?php
 if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 
-// ActivityPub implementation for GNUBOARD 5
+// ActivityPub plugin for Gnuboard 5
 // Go Namhyeon <gnh1201@gmail.com>
 
 // References:
@@ -219,56 +219,56 @@ class _GNUBOARD_ActivityPub {
 
                     // 공개 게시물일 때
                     if ($_to == NAMESPACE_ACTIVITYSTREAMS_PUBLIC) {
-						$mb = get_member(ACTIVITYPUB_G5_USERNAME);
+                        $mb = get_member(ACTIVITYPUB_G5_USERNAME);
 
                         $write_table = ACTIVITYPUB_G5_TABLENAME;
-						$wr_num = get_next_num($write_table);
-						$wr_reply = '';
-						$ca_name = 'ActivityStreams';
-						$wr_subject = mb_substr($content, 0, 45);
-						$wr_content = $content;
-						$wr_link1 = $data['actor'];
-						$wr_homepage = $data['actor'];
+                        $wr_num = get_next_num($write_table);
+                        $wr_reply = '';
+                        $ca_name = 'ActivityStreams';
+                        $wr_subject = mb_substr($content, 0, 45);
+                        $wr_content = $content;
+                        $wr_link1 = $data['actor'];
+                        $wr_homepage = $data['actor'];
 
-						$sql = "
-							insert into $write_table
-								set wr_num = '$wr_num',
-									wr_reply = '$wr_reply',
-									wr_comment = 0,
-									ca_name = '$ca_name',
-									wr_option = '',
-									wr_subject = '$wr_subject',
-									wr_content = '$wr_content',
-									wr_seo_title = '$wr_seo_title',
-									wr_link1 = '$wr_link1',
-									wr_link2 = '',
-									wr_link1_hit = 0,
-									wr_link2_hit = 0,
-									wr_hit = 0,
-									wr_good = 0,
-									wr_nogood = 0,
-									mb_id = '{$mb['mb_id']}',
-									wr_password = '',
-									wr_name = '{$mb['mb_name']}',
-									wr_email = '',
-									wr_homepage = '$wr_homepage',
-									wr_datetime = '" . G5_TIME_YMDHIS . "',
-									wr_last = '" . G5_TIME_YMDHIS . "',
-									wr_ip = '{$_SERVER['REMOTE_ADDR']}',
-									wr_1 = '',
-									wr_2 = '',
-									wr_3 = '',
-									wr_4 = '',
-									wr_5 = '',
-									wr_6 = '',
-									wr_7 = '',
-									wr_8 = '',
-									wr_9 = '',
-									wr_10 = ''
-						";
-						sql_query($sql);
+                        $sql = "
+                            insert into $write_table
+                                set wr_num = '$wr_num',
+                                    wr_reply = '$wr_reply',
+                                    wr_comment = 0,
+                                    ca_name = '$ca_name',
+                                    wr_option = '',
+                                    wr_subject = '$wr_subject',
+                                    wr_content = '$wr_content',
+                                    wr_seo_title = '$wr_seo_title',
+                                    wr_link1 = '$wr_link1',
+                                    wr_link2 = '',
+                                    wr_link1_hit = 0,
+                                    wr_link2_hit = 0,
+                                    wr_hit = 0,
+                                    wr_good = 0,
+                                    wr_nogood = 0,
+                                    mb_id = '{$mb['mb_id']}',
+                                    wr_password = '',
+                                    wr_name = '{$mb['mb_name']}',
+                                    wr_email = '',
+                                    wr_homepage = '$wr_homepage',
+                                    wr_datetime = '" . G5_TIME_YMDHIS . "',
+                                    wr_last = '" . G5_TIME_YMDHIS . "',
+                                    wr_ip = '{$_SERVER['REMOTE_ADDR']}',
+                                    wr_1 = '',
+                                    wr_2 = '',
+                                    wr_3 = '',
+                                    wr_4 = '',
+                                    wr_5 = '',
+                                    wr_6 = '',
+                                    wr_7 = '',
+                                    wr_8 = '',
+                                    wr_9 = '',
+                                    wr_10 = ''
+                        ";
+                        sql_query($sql);
 
-						return activitypub_json_encode(array("message" => "Success"));
+                        return activitypub_json_encode(array("message" => "Success"));
                     }
 
                     // 특정 회원이 지목되어 있을 때 -> 메모로 작성
@@ -410,10 +410,9 @@ switch ($route) {
         _GNUBOARD_ActivityPub::close();
         break;
         
-    case "activitypub.liked":
+    case "activitypub.linked":
         _GNUBOARD_ActivityPub::open();
-        echo _GNUBOARD_ActivityPub::liked();
+        echo _GNUBOARD_ActivityPub::linked();
         _GNUBOARD_ActivityPub::close();
         break;
 }
-
