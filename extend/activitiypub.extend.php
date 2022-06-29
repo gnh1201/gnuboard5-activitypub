@@ -97,7 +97,7 @@ function activitypub_get_following($mb) {
 }
 
 function activitypub_parse_url($url) {
-    $ctx = parse_url($object['id']);
+    $ctx = parse_url($url);
     $qstr = $ctx['query'];
     parse_str($qstr, $qctx);
     $ctx['query'] = $qctx;
@@ -105,28 +105,12 @@ function activitypub_parse_url($url) {
 }
 
 function activitypub_add_memo($mb_id, $recv_mb_id, $me_memo) {
+	global $g5;
+	
     $tmp_row = sql_fetch(" select max(me_id) as max_me_id from {$g5['memo_table']} ");
     $me_id = $tmp_row['max_me_id'] + 1;
 
-    $sql = "
-        insert into {$g5['memo_table']} (
-            me_recv_mb_id,
-            me_send_mb_id,
-            me_send_datetime
-            me_memo,
-            me_read_datetime,
-            me_type,
-            me_send_ip
-        ) values (
-            '$recv_mb_id',
-            '$mb_id',
-            '" . G5_TIME_YMDHIS . "',
-            '{$me_memo}',
-            '0000-00-00 00:00:00' ,
-            'recv',
-            '{$_SERVER['REMOTE_ADDR']}'
-        )
-    ";
+	$sql = " insert into {$g5['memo_table']} ( me_recv_mb_id, me_send_mb_id, me_send_datetime, me_memo, me_read_datetime, me_type, me_send_ip ) values ( '$recv_mb_id', '$mb_id', '".G5_TIME_YMDHIS."', '$me_memo', '0000-00-00 00:00:00' , 'recv', '{$_SERVER['REMOTE_ADDR']}' ) ";
     sql_query($sql);
 
     return ($me_id == sql_insert_id());
@@ -187,7 +171,7 @@ class _GNUBOARD_ActivityPub {
 		// 게시물이 특정된 경우 댓글로 저장 (그누 전용)
 
         $data = json_decode(file_get_contents("php://input"), true);
-        
+
         if (empty($data['@context'])) {
             return activitypub_json_encode(array("message" => "This is a broken context"));
         }
@@ -207,12 +191,13 @@ class _GNUBOARD_ActivityPub {
 
                 // 내용 처리
                 $object = $data['object'];
-                if (empty($object)) {
+                if (empty($object['content'])) {
                     return activitypub_json_encode(array("message" => "Content is empty"));
                 }
                 $content = $object['content'];
 
                 // 받을사람 처리
+				$to = $data['to'];
                 foreach($to as $_to) {
                     $query = activitypub_parse_url($_to)['query'];
 
@@ -274,20 +259,20 @@ class _GNUBOARD_ActivityPub {
                     else if (!empty($query['mb_id'])) {
                         switch ($query['route']) {
                             case "activitypub.whois":
-                                activitypub_add_memo($query['mb_id'], $content);
+                                activitypub_add_memo($mb['mb_id'], $query['mb_id'], $content);
                                 break;
 
                             case "activitypub.followers":
                                 $followers = activitypub_get_followers($mb);
                                 foreach($followers as $_mb_id) {
-                                    activitypub_add_memo($_mb_id, $content);
+                                    activitypub_add_memo($mb['mb_id'], $_mb_id, $content);
                                 }
                                 break;
 
                             case "activitypub.following":
                                 $following = activitypub_get_following($mb);
                                 foreach($following as $_mb_id) {
-                                    activitypub_add_memo($_mb_id, $content);
+                                    activitypub_add_memo($mb['mb_id'], $_mb_id, $content);
                                 }
                                 break;
                         }
