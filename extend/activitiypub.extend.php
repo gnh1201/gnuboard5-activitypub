@@ -184,9 +184,10 @@ class _GNUBOARD_ActivityPub {
     }
 
     public static function inbox() {
-        // 개인에게 보낸 메시지는 쪽지
-        // 공개(Public) 설정한 메시지는 ACTIVITYPUB_STREAMS_TABLENAME 에 저장
-        
+        // 개인에게 보낸 메시지는 쪽지에 저장
+        // 공개(Public) 설정한 메시지는 ACTIVITYPUB_G5_TABLENAME에 저장
+		// 게시물이 특정된 경우 댓글로 저장 (그누 전용)
+
         $data = json_decode(file_get_contents("php://input"), true);
         
         if (empty($data['@context'])) {
