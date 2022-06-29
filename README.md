@@ -6,4 +6,4 @@ ActivityPub implementation for GNUBOARD 5
 
 ## 사용 전 설정
   * `apstreams` 게시판 추가
-  * `apstream` 사용자 추가
+  * `apstreams` 사용자 추가
