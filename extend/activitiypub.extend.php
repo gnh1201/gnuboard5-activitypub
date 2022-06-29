@@ -105,12 +105,12 @@ function activitypub_parse_url($url) {
 }
 
 function activitypub_add_memo($mb_id, $recv_mb_id, $me_memo) {
-	global $g5;
-	
+    global $g5;
+    
     $tmp_row = sql_fetch(" select max(me_id) as max_me_id from {$g5['memo_table']} ");
     $me_id = $tmp_row['max_me_id'] + 1;
 
-	$sql = " insert into {$g5['memo_table']} ( me_recv_mb_id, me_send_mb_id, me_send_datetime, me_memo, me_read_datetime, me_type, me_send_ip ) values ( '$recv_mb_id', '$mb_id', '".G5_TIME_YMDHIS."', '$me_memo', '0000-00-00 00:00:00' , 'recv', '{$_SERVER['REMOTE_ADDR']}' ) ";
+    $sql = " insert into {$g5['memo_table']} ( me_recv_mb_id, me_send_mb_id, me_send_datetime, me_memo, me_read_datetime, me_type, me_send_ip ) values ( '$recv_mb_id', '$mb_id', '".G5_TIME_YMDHIS."', '$me_memo', '0000-00-00 00:00:00' , 'recv', '{$_SERVER['REMOTE_ADDR']}' ) ";
     sql_query($sql);
 
     return ($me_id == sql_insert_id());
@@ -168,7 +168,7 @@ class _GNUBOARD_ActivityPub {
     public static function inbox() {
         // 개인에게 보낸 메시지는 쪽지에 저장
         // 공개(Public) 설정한 메시지는 ACTIVITYPUB_G5_TABLENAME에 저장
-		// 게시물이 특정된 경우 댓글로 저장 (그누 전용)
+        // 게시물이 특정된 경우 댓글로 저장 (그누 전용)
 
         $data = json_decode(file_get_contents("php://input"), true);
 
@@ -197,7 +197,7 @@ class _GNUBOARD_ActivityPub {
                 $content = $object['content'];
 
                 // 받을사람 처리
-				$to = $data['to'];
+                $to = $data['to'];
                 foreach($to as $_to) {
                     $query = activitypub_parse_url($_to)['query'];
 
