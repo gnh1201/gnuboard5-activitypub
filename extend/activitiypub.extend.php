@@ -185,7 +185,7 @@ class _GNUBOARD_ActivityPub {
                 // 멤버정보 처리
                 $mb_id = activitypub_parse_url($data['actor'])['query']['mb_id'];
                 if (empty($mb_id)) {
-                    return activitypub_json_encode(array("message" => "This is not a valid actor"));
+                    $mb_id = ACTIVITYPUB_G5_USERNAME;   // 그누보드에 호환되는 액터가 아니므로 기본 액터(mb_id=apstreams) 사용
                 }
                 $mb = get_member($mb_id);
 
