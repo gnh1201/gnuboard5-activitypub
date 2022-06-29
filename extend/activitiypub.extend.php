@@ -171,13 +171,11 @@ class _GNUBOARD_ActivityPub {
         );
 
         if (!empty($params['bo_table']) && !empty($params['wr_id'])) {
-            $query_string = http_build_query(array(
+            $qstr = http_build_query(array(
                 "bo_table" => $params['bo_table'],
                 "wr_id" => $params['wr_id']
             ));
-
-            $link = G5_BBS_URL . "/board.php?" . $query_string;
-            header("Location: " . $link);
+            header("Location: " . G5_BBS_URL . "/board.php?" . $qstr);
         } else {
             return activitypub_json_encode(array("message" => "Could not find the stream"));
         }
