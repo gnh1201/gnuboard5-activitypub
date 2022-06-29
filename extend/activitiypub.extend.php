@@ -1,7 +1,7 @@
 <?php
 if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 
-// ActivityPub plugin for Gnuboard 5
+// ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 
 // References:
@@ -410,9 +410,9 @@ switch ($route) {
         _GNUBOARD_ActivityPub::close();
         break;
         
-    case "activitypub.linked":
+    case "activitypub.liked":
         _GNUBOARD_ActivityPub::open();
-        echo _GNUBOARD_ActivityPub::linked();
+        echo _GNUBOARD_ActivityPub::liked();
         _GNUBOARD_ActivityPub::close();
         break;
 }
