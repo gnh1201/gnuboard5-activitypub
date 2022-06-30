@@ -126,21 +126,62 @@ function activitypub_set_liked($good, $bo_table, $wr_id) {
     sql_query(" insert {$g5['board_good_table']} set bo_table = '{$bo_table}', wr_id = '{$wr_id}', mb_id = '" . ACTIVITYPUB_G5_USERNAME . "', bg_flag = '{$good}', bg_datetime = '" . G5_TIME_YMDHIS . "' ");
 }
 
-function activitypub_send_to_inbox($remote_inbox_url, $object) {
+function activitypub_send_to_inbox($object) {
     $server_list_file = G5_DATA_PATH . "/activitypub-servers.php";
 
     if (!file_exists($server_list_file))
         return false;
 
+    // 수신자 확인
+    $to = $object['to'];
+    
+    // 외부로 보낼 전문 생성
+    $context = array(
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "type" => "Create",
+        "id" => "",
+        "to" => $to,
+        "actor" => $object['attributedTo'],
+        "object" => $object
+    );
+    $rawdata = activitypub_json_encode($context);
+
+    // 서버 정보 불러오기
     $servers = json_decode(include($server_list_file), true);
-    foreach($servers as $k=>$v) {
-        // TODO
+    
+    // 수신자 작업
+    foreach($to as $_to) {
+        // 수신자 정보 파싱
+        $url_ctx = activitypub_parse_url($_to);
+
+        // 수신자 서버에 연결
+        foreach($servers as $remote_base_url=>$attr) {
+            if (!$attr['enabled']) continue;   // 비활성화 상태면 작업하지 않음
+
+            // 일치하는 서버 찾기
+            $pos = strpos($remote_base_url, sprintf("%s://%s", $url_ctx['scheme'], $url_ctx['host']));
+            if ($pos === 0) {
+                // 사용자 정보 조회
+                $ch = curl_init();
+                curl_setopt_array($ch, array(
+                    CURLOPT_URL => $_to,
+                    CURLOPT_HTTPHEADER => array(
+                        "Accept" => "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"",
+                        "Authorization" => "Bearer " . $attr['accesstoken'] 
+                    )
+                ));
+                
+                // TODO
+                
+                break;
+            }
+        }
     }
 }
 
 function activitypub_parse_content($content) {
     $entities = array();
-    
+
     $pos = -1;
     $get_next_position = function ($pos) use ($content) {
         try {
