@@ -15,8 +15,12 @@ define("ACTIVITYPUB_G5_USERNAME", "apstreams");
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
 
-function activitypub_get_url($action, $params) {
-    return ACTIVITYPUB_URL . "/?route=activitypub." . $action . "&" . http_build_query($params);
+function activitypub_get_url($action, $params = array()) {
+    if (count(array_keys($params)) > 0) {
+        return ACTIVITYPUB_URL . "/?route=activitypub." . $action . "&" . http_build_query($params);
+    } else {
+        return ACTIVITYPUB_URL . "/?route=activitypub." . $action;
+    }           
 }
 
 function activitypub_json_encode($arr) {
@@ -168,9 +172,39 @@ function activitypub_send_to_inbox($object) {
                     CURLOPT_HTTPHEADER => array(
                         "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
                         "Authorization" => "Bearer " . $attr['accesstoken'] 
-                    )
+                    ),
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_CONNECTTIMEOUT => 10,
+                    CURLOPT_RETURNTRANSFER => true
                 ));
+                $response = curl_exec($ch);
+                $remote_user_ctx = json_decode($response, true);
                 
+                // inbox 주소 찾기
+                $remote_inbox_url = $remote_user_ctx['inbox']
+                if (empty($remote_inbox_url))
+                    $remote_inbox_url = $remote_user_ctx['endpoints']['sharedInbox'];
+
+                // inbox 주소가 없으면 건너뛰기
+                if (empty($remote_inbox_url)) continue;
+
+                // inbox에 연결
+                $ch = curl_init();
+                curl_setopt_array($ch, array(
+                    CURLOPT_URL => $remote_inbox_url,
+                    CURLOPT_HTTPHEADER => array(
+                        "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
+                        "Authorization" => "Bearer " . $attr['accesstoken'] 
+                    ),
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_POST => true,
+                    CURLOPT_CONNECTTIMEOUT => 10,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POSTFIELDS => $rawdata
+                ));
+                $response = curl_exec($ch);
+                $remote_inbox_ctx = json_decode($response, true);
+
                 // TODO
                 
                 break;
@@ -248,6 +282,9 @@ class _GNUBOARD_ActivityPub {
             "liked" => activitypub_get_url("liked", array("mb_id" => $mb['mb_id'])),
             "icon" => array(
                 activitypub_get_icon($mb)
+            )
+            "endpoints" => array(
+                "sharedInbox" => activitypub_get_url("inbox")
             )
         );
 
