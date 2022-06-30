@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit;
 return <<<EOF
 {
     "self": {
-		"enabled: true,
+        "enabled: true,
         "platform": "gnuboard5",
         "user": "/?route=activitypub.user&mb_id=:username",
         "inbox": "/?route=activitypub.inbox",
@@ -14,7 +14,7 @@ return <<<EOF
         ]
     },
     "https://mastodon.social": {
-		"enabled": ture,
+        "enabled": ture,
         "platform": "mastodon",
         "user": "/users/:username",
         "inbox": "/inbox",
@@ -25,7 +25,7 @@ return <<<EOF
         ]
     },
     "https://peertube.local": {
-		"enabled": false,
+        "enabled": false,
         "platform": "peertube",
         "user": "/accounts/:username",
         "inbox": "/inbox",
