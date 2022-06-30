@@ -116,6 +116,16 @@ function activitypub_add_memo($mb_id, $recv_mb_id, $me_memo) {
     return ($me_id == sql_insert_id());
 }
 
+function activitypub_set_liked($good, $bo_table, $wr_id) {
+    global $g5;
+
+    // 추천(찬성), 비추천(반대) 카운트 증가
+    sql_query(" update {$g5['write_prefix']}{$bo_table} set wr_{$good} = wr_{$good} + 1 where wr_id = '{$wr_id}' ");
+
+    // 내역 생성
+    sql_query(" insert {$g5['board_good_table']} set bo_table = '{$bo_table}', wr_id = '{$wr_id}', mb_id = '" . ACTIVITYPUB_G5_USERNAME . "', bg_flag = '{$good}', bg_datetime = '" . G5_TIME_YMDHIS . "' ");
+}
+
 class _GNUBOARD_ActivityPub {
     public static function open() {
         header("Content-Type: application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"");
@@ -166,6 +176,8 @@ class _GNUBOARD_ActivityPub {
     }
 
     public static function inbox() {
+        global $g5;
+
         // 개인에게 보낸 메시지는 쪽지에 저장
         // 공개(Public) 설정한 메시지는 ACTIVITYPUB_G5_TABLENAME에 저장
         // 게시물이 특정된 경우 댓글로 저장 (그누 전용)
@@ -180,180 +192,242 @@ class _GNUBOARD_ActivityPub {
             return activitypub_json_encode(array("message" => "This is not an ActivityStreams request"));
         }
         
-        switch ($data['type']) {
-            case "Create":
-                // 멤버정보 처리
-                $mb_id = activitypub_parse_url($data['actor'])['query']['mb_id'];
-                if (empty($mb_id)) {
-                    $mb_id = ACTIVITYPUB_G5_USERNAME;   // 그누보드에 호환되는 액터가 아니므로 기본 액터(mb_id=apstreams) 사용
-                }
-                $mb = get_member($mb_id);
-                
-                // 수신자 확인
-                $to = $data['to'];
+        if (!empty($data['type'])) {
+            // 멤버정보 처리
+            $mb_id = activitypub_parse_url($data['actor'])['query']['mb_id'];
+            if (empty($mb_id)) {
+                $mb_id = ACTIVITYPUB_G5_USERNAME;   // 그누보드에 호환되는 액터가 아니므로 기본 액터(mb_id=apstreams) 사용
+            }
+            $mb = get_member($mb_id);
+            
+            // 수신자 확인
+            $to = $data['to'];
 
-                // 원글 정보 확인
-                $object = $data['object'];
+            // 원글 정보 확인
+            $object = $data['object'];
+        
+            // 타입 별 해야될 일 지정
+            switch ($data['type']) {
+                case "Create":
+                    // 내용 처리
+                    if (empty($object['content'])) {
+                        return activitypub_json_encode(array("message" => "Content is empty"));
+                    }
+                    $content = $object['content'];
 
-                // 내용 처리
-                if (empty($object['content'])) {
-                    return activitypub_json_encode(array("message" => "Content is empty"));
-                }
-                $content = $object['content'];
+                    // 답글인지 확인
+                    if (!empty($object['inReplyTo'])) {
+                        // 답글 정보 확인
+                        $query = activitypub_parse_url($object['inReplyTo'])['query'];
 
-                // 답글인지 확인
-                if (!empty($object['inReplyTo'])) {
-                    // 답글 정보 확인
-                    $query = activitypub_parse_url($object['inReplyTo'])['query'];
+                        // 특정 글이 지목되어 있을 때 -> 댓글로 작성
+                        if (!empty($query['bo_table']) && !empty($query['wr_id'])) {
+                            $wr_id = $query['wr_id'];
+                            $write_table = G5_TABLE_PREFIX . $query['bo_table'];
+                            $wr = get_write($write_table, $wr_id);
 
-                    // 특정 글이 지목되어 있을 때 -> 댓글로 작성
-                    if (!empty($query['bo_table']) && !empty($query['wr_id'])) {
-                        $wr_id = $query['wr_id'];
-                        $write_table = G5_TABLE_PREFIX . $query['bo_table'];
-                        $wr = get_write($write_table, $wr_id);
+                            // 글이 존재하는 경우
+                            if (!empty($wr['wr_id'])) {
+                                $mb = get_member(ACTIVITYPUB_G5_USERNAME);
+                                $wr_homepage = $data['actor'];
 
-                        // 글이 존재하는 경우
-                        if (!empty($wr['wr_id'])) {
-                            $mb = get_member(ACTIVITYPUB_G5_USERNAME);
-                            $wr_homepage = $data['actor'];
+                                $sql = "
+                                    insert into $write_table
+                                        set ca_name = '{$wr['ca_name']}',
+                                             wr_option = '',
+                                             wr_num = '{$wr['wr_num']}',
+                                             wr_reply = '',
+                                             wr_parent = '{$wr['wr_id']}',
+                                             wr_is_comment = 1,
+                                             wr_comment = '',
+                                             wr_comment_reply = '',
+                                             wr_subject = '',
+                                             wr_content = '$content',
+                                             mb_id = '{$mb['mb_id']}',
+                                             wr_password = '',
+                                             wr_name = '{$mb['mb_name']}',
+                                             wr_email = '',
+                                             wr_homepage = '$wr_homepage',
+                                             wr_datetime = '" . G5_TIME_YMDHIS . "',
+                                             wr_last = '',
+                                             wr_ip = '{$_SERVER['REMOTE_ADDR']}',
+                                             wr_1 = '',
+                                             wr_2 = '',
+                                             wr_3 = '',
+                                             wr_4 = '',
+                                             wr_5 = '',
+                                             wr_6 = '',
+                                             wr_7 = '',
+                                             wr_8 = '',
+                                             wr_9 = '',
+                                             wr_10 = ''
+                                ";
+                                sql_query($sql);
+                            }
 
-                            $sql = "
-                                insert into $write_table
-                                    set ca_name = '{$wr['ca_name']}',
-                                         wr_option = '',
-                                         wr_num = '{$wr['wr_num']}',
-                                         wr_reply = '',
-                                         wr_parent = '{$wr['wr_id']}',
-                                         wr_is_comment = 1,
-                                         wr_comment = '',
-                                         wr_comment_reply = '',
-                                         wr_subject = '',
-                                         wr_content = '$content',
-                                         mb_id = '{$mb['mb_id']}',
-                                         wr_password = '',
-                                         wr_name = '{$mb['mb_name']}',
-                                         wr_email = '',
-                                         wr_homepage = '$wr_homepage',
-                                         wr_datetime = '" . G5_TIME_YMDHIS . "',
-                                         wr_last = '',
-                                         wr_ip = '{$_SERVER['REMOTE_ADDR']}',
-                                         wr_1 = '',
-                                         wr_2 = '',
-                                         wr_3 = '',
-                                         wr_4 = '',
-                                         wr_5 = '',
-                                         wr_6 = '',
-                                         wr_7 = '',
-                                         wr_8 = '',
-                                         wr_9 = '',
-                                         wr_10 = ''
-                            ";
-                            sql_query($sql);
+                            // 원글이 삭제된 경우
+                            else {
+                                return activitypub_json_encode(array("message" => "Could not find the original message"));
+                            }
                         }
+                    }
+                    break;
 
-                        // 원글이 삭제된 경우 오류를 기록 
+                case "Like":
+                    // '좋아요'는 원글 표시가 문자열로 되어 있음
+                    if (is_string($object)) {
+                        $query = activitypub_parse_url($object);
+
+                        // 원글을 특정한 경우
+                        if (!empty($query['bo_table']) && !empty($query['wr_id'])) {
+                            $wr_id = $query['wr_id'];
+                            $write_table = G5_TABLE_PREFIX . $query['bo_table'];
+                            $wr = get_write($write_table, $wr_id);
+
+                            // 원글이 존재하는 경우
+                            if (!empty($wr['wr_id'])) {
+                                activitypub_set_liked("good", $query['bo_table'], $wr['wr_id']);
+                            }
+
+                            // 원글이 삭제된 경우
+                            else {
+                                return activitypub_json_encode(array("message" => "Could not find the original message"));
+                            }
+                        }
+                        
+                        // 특정하지 않은 경우
                         else {
-                            activitypub_add_memo(
-                                ACTIVITYPUB_G5_USERNAME,
-                                ACTIVITYPUB_G5_USERNAME,
-                                (
-                                    "[ERROR: Could not find the original message]\r\n\r\n" .
-                                    "From: " . $data['actor'] . "\r\n" .
-                                    "To: " . implode(", ", $to)  . "\r\n" .
-                                    $content .
-                                    "\r\n\r\n" .
-                                    G5_TIME_YMDHIS
-                                )
-                            );
+                            return activitypub_json_encode(array("message" => "Please specify the original message"));
                         }
                     }
-                }
-
-                // 받을사람 처리
-                foreach($to as $_to) {
-                    $query = activitypub_parse_url($_to)['query'];
-
-                    // 공개 게시물일 때
-                    if ($_to == NAMESPACE_ACTIVITYSTREAMS_PUBLIC) {
-                        $mb = get_member(ACTIVITYPUB_G5_USERNAME);
-
-                        $write_table = ACTIVITYPUB_G5_TABLENAME;
-                        $wr_num = get_next_num($write_table);
-                        $wr_reply = '';
-                        $ca_name = 'ActivityStreams';
-                        $wr_subject = mb_substr($content, 0, 45);
-                        $wr_content = $content;
-                        $wr_link1 = $data['actor'];
-                        $wr_homepage = $data['actor'];
-
-                        $sql = "
-                            insert into $write_table
-                                set wr_num = '$wr_num',
-                                    wr_reply = '$wr_reply',
-                                    wr_comment = 0,
-                                    ca_name = '$ca_name',
-                                    wr_option = '',
-                                    wr_subject = '$wr_subject',
-                                    wr_content = '$wr_content',
-                                    wr_seo_title = '$wr_seo_title',
-                                    wr_link1 = '$wr_link1',
-                                    wr_link2 = '',
-                                    wr_link1_hit = 0,
-                                    wr_link2_hit = 0,
-                                    wr_hit = 0,
-                                    wr_good = 0,
-                                    wr_nogood = 0,
-                                    mb_id = '{$mb['mb_id']}',
-                                    wr_password = '',
-                                    wr_name = '{$mb['mb_name']}',
-                                    wr_email = '',
-                                    wr_homepage = '$wr_homepage',
-                                    wr_datetime = '" . G5_TIME_YMDHIS . "',
-                                    wr_last = '" . G5_TIME_YMDHIS . "',
-                                    wr_ip = '{$_SERVER['REMOTE_ADDR']}',
-                                    wr_1 = '',
-                                    wr_2 = '',
-                                    wr_3 = '',
-                                    wr_4 = '',
-                                    wr_5 = '',
-                                    wr_6 = '',
-                                    wr_7 = '',
-                                    wr_8 = '',
-                                    wr_9 = '',
-                                    wr_10 = ''
-                        ";
-                        sql_query($sql);
-
-                        return activitypub_json_encode(array("message" => "Success"));
+                    
+                    // 문자열이 아닌 경우
+                    else {
+                        return activitypub_json_encode(array("message" => "'Object' must be set type to 'String' to request 'Like' type"));
                     }
+                    break;
+                    
+                case "Dislike":
+                    // '싫어요'는 원글 표시가 문자열로 되어 있음
+                    if (is_string($object)) {
+                        $query = activitypub_parse_url($object);
 
-                    // 특정 회원이 지목되어 있을 때 -> 메모로 작성
-                    else if (!empty($query['mb_id'])) {
-                        switch ($query['route']) {
-                            case "activitypub.whois":
-                                activitypub_add_memo($mb['mb_id'], $query['mb_id'], $content);
-                                break;
+                        // 원글을 특정한 경우
+                        if (!empty($query['bo_table']) && !empty($query['wr_id'])) {
+                            $wr_id = $query['wr_id'];
+                            $write_table = G5_TABLE_PREFIX . $query['bo_table'];
+                            $wr = get_write($write_table, $wr_id);
 
-                            case "activitypub.followers":
-                                $followers = activitypub_get_followers($mb);
-                                foreach($followers as $_mb_id) {
-                                    activitypub_add_memo($mb['mb_id'], $_mb_id, $content);
-                                }
-                                break;
+                            // 원글이 존재하는 경우
+                            if (!empty($wr['wr_id'])) {
+                                activitypub_set_liked("nogood", $query['bo_table'], $wr['wr_id']);
+                            }
 
-                            case "activitypub.following":
-                                $following = activitypub_get_following($mb);
-                                foreach($following as $_mb_id) {
-                                    activitypub_add_memo($mb['mb_id'], $_mb_id, $content);
-                                }
-                                break;
+                            // 원글이 삭제된 경우
+                            else {
+                                return activitypub_json_encode(array("message" => "Could not find the original message"));
+                            }
+                        }
+                        
+                        // 특정하지 않은 경우
+                        else {
+                            return activitypub_json_encode(array("message" => "Please specify the original message"));
                         }
                     }
-                }
-                break;
+                    
+                    // 문자열이 아닌 경우
+                    else {
+                        return activitypub_json_encode(array("message" => "'Object' must be set type to 'String' to request 'Like' type"));
+                    }
+                    break;
 
-            default:
-                return activitypub_json_encode(array("message" => "This is not implemented type"));
+                default:
+                    return activitypub_json_encode(array("message" => "This is not implemented type"));
+            }
+
+            // 받을사람(수신자) 처리
+            foreach($to as $_to) {
+                $query = activitypub_parse_url($_to)['query'];
+
+                // 공개 게시물일 때
+                if ($_to == NAMESPACE_ACTIVITYSTREAMS_PUBLIC) {
+                    $mb = get_member(ACTIVITYPUB_G5_USERNAME);
+
+                    $write_table = ACTIVITYPUB_G5_TABLENAME;
+                    $wr_num = get_next_num($write_table);
+                    $wr_reply = '';
+                    $ca_name = 'ActivityStreams';
+                    $wr_subject = mb_substr($content, 0, 45);
+                    $wr_seo_title = mb_substr($content, 0, 45);
+                    $wr_content = $content;
+                    $wr_link1 = $data['actor'];
+                    $wr_link2 = '';
+                    $wr_homepage = $data['actor'];
+
+                    $sql = "
+                        insert into $write_table
+                            set wr_num = '$wr_num',
+                                wr_reply = '$wr_reply',
+                                wr_comment = 0,
+                                ca_name = '$ca_name',
+                                wr_option = '',
+                                wr_subject = '$wr_subject',
+                                wr_content = '$wr_content',
+                                wr_seo_title = '$wr_seo_title',
+                                wr_link1 = '$wr_link1',
+                                wr_link2 = '$wr_link2',
+                                wr_link1_hit = 0,
+                                wr_link2_hit = 0,
+                                wr_hit = 0,
+                                wr_good = 0,
+                                wr_nogood = 0,
+                                mb_id = '{$mb['mb_id']}',
+                                wr_password = '',
+                                wr_name = '{$mb['mb_name']}',
+                                wr_email = '',
+                                wr_homepage = '$wr_homepage',
+                                wr_datetime = '" . G5_TIME_YMDHIS . "',
+                                wr_last = '" . G5_TIME_YMDHIS . "',
+                                wr_ip = '{$_SERVER['REMOTE_ADDR']}',
+                                wr_1 = '',
+                                wr_2 = '',
+                                wr_3 = '',
+                                wr_4 = '',
+                                wr_5 = '',
+                                wr_6 = '',
+                                wr_7 = '',
+                                wr_8 = '',
+                                wr_9 = '',
+                                wr_10 = ''
+                    ";
+                    sql_query($sql);
+
+                    return activitypub_json_encode(array("message" => "Success"));
+                }
+
+                // 특정 회원이 지목되어 있을 때 -> 메모로 작성
+                else if (!empty($query['mb_id'])) {
+                    switch ($query['route']) {
+                        case "activitypub.whois":
+                            activitypub_add_memo($mb['mb_id'], $query['mb_id'], $content);
+                            break;
+
+                        case "activitypub.followers":
+                            $followers = activitypub_get_followers($mb);
+                            foreach($followers as $_mb_id) {
+                                activitypub_add_memo($mb['mb_id'], $_mb_id, $content);
+                            }
+                            break;
+
+                        case "activitypub.following":
+                            $following = activitypub_get_following($mb);
+                            foreach($following as $_mb_id) {
+                                activitypub_add_memo($mb['mb_id'], $_mb_id, $content);
+                            }
+                            break;
+                    }
+                }
+            }
         }
     }
 
@@ -362,21 +436,27 @@ class _GNUBOARD_ActivityPub {
     }
 
     public static function followers() {
-        $mb = get_member($_GET['mb_id']);
+        $params = array(
+            "mb_id" => $_GET['mb_id']
+        );
+
+        $mb = get_member($params['mb_id']);
         return activitypub_json_encode(array("followers" => activitypub_get_followers($mb)));
     }
     
     public static function following() {
+        $params = array(
+            "mb_id" => $_GET['mb_id']
+        );
+        
         $mb = get_member($_GET['mb_id']);
         return activitypub_json_encode(array("following" => activitypub_get_following($mb)));
     }
 
     public static function liked() {
-        return array(
-            "message" => "Not implemented"
-        );
+        return self::inbox();
     }
-    
+
     public static function close() {
         exit();
     }
