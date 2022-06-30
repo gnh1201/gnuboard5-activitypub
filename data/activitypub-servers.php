@@ -8,17 +8,16 @@ return <<<EOF
         "platform": "gnuboard5",
         "user": "/?route=activitypub.user&mb_id=:username",
         "inbox": "/?route=activitypub.inbox",
-        "userinbox": "/?route=activitypub.inbox&mb_id=:username",
+        "accesstoken": "YOUR ACCESSTOKEN HERE",
         "docs": [
             "https://github.com/gnh1201/gnuboard5-activitypub"
         ]
     },
     "https://mastodon.social": {
-        "enabled": ture,
+        "enabled": false,
         "platform": "mastodon",
         "user": "/users/:username",
         "inbox": "/inbox",
-        "userinbox": "/user/inbox/:username/inbox",
         "accesstoken": "YOUR ACCESSTOKEN HERE",
         "docs": [
             "https://docs.joinmastodon.org/spec/activitypub/"
@@ -29,7 +28,7 @@ return <<<EOF
         "platform": "peertube",
         "user": "/accounts/:username",
         "inbox": "/inbox",
-        "userinbox": "/accounts/:username/inbox",
+        "accesstoken": "YOUR ACCESSTOKEN HERE",
         "docs": [
             "https://docs.joinpeertube.org/api-rest-reference.html"
         ]
