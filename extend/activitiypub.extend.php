@@ -137,7 +137,7 @@ function activitypub_send_to_inbox($object) {
     
     // 외부로 보낼 전문 생성
     $context = array(
-        "@context" => "https://www.w3.org/ns/activitystreams",
+        "@context" => NAMESPACE_ACTIVITYSTREAMS,
         "type" => "Create",
         "id" => "",
         "to" => $to,
@@ -166,7 +166,7 @@ function activitypub_send_to_inbox($object) {
                 curl_setopt_array($ch, array(
                     CURLOPT_URL => $_to,
                     CURLOPT_HTTPHEADER => array(
-                        "Accept" => "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"",
+                        "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
                         "Authorization" => "Bearer " . $attr['accesstoken'] 
                     )
                 ));
@@ -224,7 +224,7 @@ function activitypub_parse_content($content) {
 
 class _GNUBOARD_ActivityPub {
     public static function open() {
-        header("Content-Type: application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"");
+        header("Content-Type: application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
     }
     
     public static function user() {
