@@ -126,12 +126,18 @@ function activitypub_set_liked($good, $bo_table, $wr_id) {
     sql_query(" insert {$g5['board_good_table']} set bo_table = '{$bo_table}', wr_id = '{$wr_id}', mb_id = '" . ACTIVITYPUB_G5_USERNAME . "', bg_flag = '{$good}', bg_datetime = '" . G5_TIME_YMDHIS . "' ");
 }
 
+function activitypub_send_to_inbox($remote_inbox_url, $object) {
+    $servers = include(G5_DATA_PATH . "/activitypub-servers.php");
+
+    // TODO
+}
+
 class _GNUBOARD_ActivityPub {
     public static function open() {
         header("Content-Type: application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"");
     }
     
-    public static function whois() {
+    public static function user() {
         $mb = get_member($_GET['mb_id']);
 
         if (!$mb['mb_id']) {
@@ -139,9 +145,9 @@ class _GNUBOARD_ActivityPub {
         }
 
         $context = array(
-            "@context" => array(ACTIVITYPUB_CONTEXT_URL, array("@language" => "ko")),
+            "@context" => array(NAMESPACE_ACTIVITYSTREAMS, array("@language" => "ko")),
             "type" => "Person",
-            "id" => activitypub_get_url("whois", array("mb_id" => $mb['mb_id'])),
+            "id" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
             "name" => $mb['mb_name'],
             "preferredUsername" => $mb['mb_nick'],
             "summary" => $mb['mb_profile'],
@@ -328,7 +334,7 @@ class _GNUBOARD_ActivityPub {
                                 return activitypub_json_encode(array("message" => "Could not find the original message"));
                             }
                         }
-                        
+
                         // 특정하지 않은 경우
                         else {
                             return activitypub_json_encode(array("message" => "Please specify the original message"));
@@ -408,7 +414,7 @@ class _GNUBOARD_ActivityPub {
                 // 특정 회원이 지목되어 있을 때 -> 메모로 작성
                 else if (!empty($query['mb_id'])) {
                     switch ($query['route']) {
-                        case "activitypub.whois":
+                        case "activitypub.user":
                             activitypub_add_memo($mb['mb_id'], $query['mb_id'], $content);
                             break;
 
@@ -465,9 +471,9 @@ class _GNUBOARD_ActivityPub {
 $route = $_GET['route'];
 
 switch ($route) {
-    case "activitypub.whois":
+    case "activitypub.user":
         _GNUBOARD_ActivityPub::open();
-        echo _GNUBOARD_ActivityPub::whois();
+        echo _GNUBOARD_ActivityPub::user();
         _GNUBOARD_ActivityPub::close();
         break;
 
