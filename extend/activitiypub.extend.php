@@ -188,13 +188,66 @@ class _GNUBOARD_ActivityPub {
                     $mb_id = ACTIVITYPUB_G5_USERNAME;   // 그누보드에 호환되는 액터가 아니므로 기본 액터(mb_id=apstreams) 사용
                 }
                 $mb = get_member($mb_id);
+                
+                // 원글 정보 확인
+                $object = $data['object'];
 
                 // 내용 처리
-                $object = $data['object'];
                 if (empty($object['content'])) {
                     return activitypub_json_encode(array("message" => "Content is empty"));
                 }
                 $content = $object['content'];
+
+                // 답글인지 확인
+                if (!empty($object['inReplyTo']) {
+                    // 답글 정보 확인
+                    $query = activitypub_parse_url($object['inReplyTo'])['query'];
+
+                    // 특정 글이 지목되어 있을 때 -> 댓글로 작성
+                    if (!empty($query['bo_table']) && !empty($query['wr_id'])) {
+                        $wr_id = $query['wr_id'];
+                        $write_table = G5_TABLE_PREFIX . $query['bo_table'];
+                        $wr = get_write($write_table, $wr_id);
+
+                        if (!empty($wr['wr_id'])) {
+                            $mb = get_member(ACTIVITYPUB_G5_USERNAME);
+                            $wr_homepage = $data['actor'];
+
+                            $sql = "
+                                insert into $write_table
+                                    set ca_name = '{$wr['ca_name']}',
+                                         wr_option = '',
+                                         wr_num = '{$wr['wr_num']}',
+                                         wr_reply = '',
+                                         wr_parent = '{$wr['wr_id']}',
+                                         wr_is_comment = 1,
+                                         wr_comment = '',
+                                         wr_comment_reply = '',
+                                         wr_subject = '',
+                                         wr_content = '$content',
+                                         mb_id = '{$mb['mb_id']}',
+                                         wr_password = '',
+                                         wr_name = '{$mb['mb_name']}',
+                                         wr_email = '',
+                                         wr_homepage = '$wr_homepage',
+                                         wr_datetime = '" . G5_TIME_YMDHIS . "',
+                                         wr_last = '',
+                                         wr_ip = '{$_SERVER['REMOTE_ADDR']}',
+                                         wr_1 = '',
+                                         wr_2 = '',
+                                         wr_3 = '',
+                                         wr_4 = '',
+                                         wr_5 = '',
+                                         wr_6 = '',
+                                         wr_7 = '',
+                                         wr_8 = '',
+                                         wr_9 = '',
+                                         wr_10 = ''
+                            ";
+                            sql_query($sql);
+                        }
+                    }
+                }
 
                 // 받을사람 처리
                 $to = $data['to'];
@@ -275,51 +328,6 @@ class _GNUBOARD_ActivityPub {
                                     activitypub_add_memo($mb['mb_id'], $_mb_id, $content);
                                 }
                                 break;
-                        }
-                    }
-
-                    // 특정 글이 지목되어 있을 때 -> 댓글로 작성
-                    else if (!empty($query['bo_table']) && !empty($query['wr_id'])) {
-                        $wr_id = $query['wr_id'];
-                        $write_table = G5_TABLE_PREFIX . $query['bo_table'];
-                        $wr = get_write($write_table, $wr_id);
-
-                        if (!empty($wr['wr_id'])) {
-                            $mb = get_member(ACTIVITYPUB_G5_USERNAME);
-                            $wr_homepage = $data['actor'];
-
-                            $sql = "
-                                insert into $write_table
-                                    set ca_name = '{$wr['ca_name']}',
-                                         wr_option = '',
-                                         wr_num = '{$wr['wr_num']}',
-                                         wr_reply = '',
-                                         wr_parent = '{$wr['wr_id']}',
-                                         wr_is_comment = 1,
-                                         wr_comment = '',
-                                         wr_comment_reply = '',
-                                         wr_subject = '',
-                                         wr_content = '$content',
-                                         mb_id = '{$mb['mb_id']}',
-                                         wr_password = '',
-                                         wr_name = '{$mb['mb_name']}',
-                                         wr_email = '',
-                                         wr_homepage = '$wr_homepage',
-                                         wr_datetime = '" . G5_TIME_YMDHIS . "',
-                                         wr_last = '',
-                                         wr_ip = '{$_SERVER['REMOTE_ADDR']}',
-                                         wr_1 = '',
-                                         wr_2 = '',
-                                         wr_3 = '',
-                                         wr_4 = '',
-                                         wr_5 = '',
-                                         wr_6 = '',
-                                         wr_7 = '',
-                                         wr_8 = '',
-                                         wr_9 = '',
-                                         wr_10 = ''
-                            ";
-                            sql_query($sql);
                         }
                     }
                 }
