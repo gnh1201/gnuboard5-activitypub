@@ -448,8 +448,8 @@ class _GNUBOARD_ActivityPub {
         $params = array(
             "mb_id" => $_GET['mb_id']
         );
-        
-        $mb = get_member($_GET['mb_id']);
+
+        $mb = get_member($params['mb_id']);
         return activitypub_json_encode(array("following" => activitypub_get_following($mb)));
     }
 
