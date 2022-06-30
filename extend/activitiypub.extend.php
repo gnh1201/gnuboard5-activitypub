@@ -46,7 +46,7 @@ function activitypub_get_icon($mb) {
 
 function activitypub_get_recent_items() {
     global $g5;
-    
+
     $items = array();
     $sql = "select * from " . $g5['board_new_table']; 
     $result = sql_query($sql);
@@ -127,9 +127,58 @@ function activitypub_set_liked($good, $bo_table, $wr_id) {
 }
 
 function activitypub_send_to_inbox($remote_inbox_url, $object) {
-    $servers = include(G5_DATA_PATH . "/activitypub-servers.php");
+    $server_list_file = G5_DATA_PATH . "/activitypub-servers.php";
 
-    // TODO
+    if (!file_exists($server_list_file))
+        return false;
+
+    $servers = json_decode(include($server_list_file), true);
+    foreach($servers as $k=>$v) {
+        // TODO
+    }
+}
+
+function activitypub_parse_content($content) {
+    $entities = array();
+    
+    $pos = -1;
+    $get_next_position = function ($pos) use ($content) {
+        try {
+            return min(array_filter(array(
+                strpos($content, '@', $pos + 1),
+                strpos($content, '#', $pos + 1),
+                strpos($content, 'http://', $pos + 1),
+                strpos($content, 'https://', $pos + 1)
+            ), "is_numeric"));
+        } catch (ValueError $e) {
+            return false;
+        }
+    };
+
+    $pos = $get_next_position($pos);
+
+    while ($pos !== false) {
+        $end = strpos($content, ' ', $pos + 1);
+
+        $expr = "";
+        if ($end !== false) {
+            $expr = substr($content, $pos, $end - $pos);
+        } else {
+            $expr = substr($content, $pos);
+        }
+
+        if (substr($expr, 0, 1) == '@') {
+            array_push($entities, array("type" => "id", "value" => $expr));
+        } else if (substr($expr, 0, 1) == '#') {
+            array_push($entities, array("type" => "hashtag", "value" => $expr));
+        } else if (substr($expr, 0, 4) == 'http') {
+            array_push($entities, array("type" => "url", "value" => $expr));
+        }
+
+        $pos = $get_next_position($pos);
+    }
+    
+    return $entities;
 }
 
 class _GNUBOARD_ActivityPub {
