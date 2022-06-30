@@ -6,8 +6,11 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
+//   * https://github.com/w3c/activitypub/issues/194
+//   * https://docs.joinmastodon.org/spec/webfinger/
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
+define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
 define("ACTIVITYPUB_URL", (empty(G5_URL) ? "http://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
 define("ACTIVITYPUB_G5_TABLENAME", G5_TABLE_PREFIX . "apstreams");
@@ -173,17 +176,16 @@ function activitypub_send_to_inbox($object) {
                         "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
                         "Authorization" => "Bearer " . $attr['accesstoken'] 
                     ),
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_CONNECTTIMEOUT => 10,
-                    CURLOPT_RETURNTRANSFER => true
+                    CURLOPT_SSL_VERIFYPEER => false
                 ));
                 $response = curl_exec($ch);
-                $remote_user_ctx = json_decode($response, true);
+                $remote_user_ctx = json_decode(curl_exec($ch), true);
                 
                 // inbox 주소 찾기
-                $remote_inbox_url = $remote_user_ctx['inbox']
-                if (empty($remote_inbox_url))
+                $remote_inbox_url = $remote_user_ctx['inbox'];
+                if (empty($remote_inbox_url)) {
                     $remote_inbox_url = $remote_user_ctx['endpoints']['sharedInbox'];
+                }
 
                 // inbox 주소가 없으면 건너뛰기
                 if (empty($remote_inbox_url)) continue;
@@ -197,13 +199,10 @@ function activitypub_send_to_inbox($object) {
                         "Authorization" => "Bearer " . $attr['accesstoken'] 
                     ),
                     CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_POST => true,
-                    CURLOPT_CONNECTTIMEOUT => 10,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POSTFIELDS => $rawdata
+                    
                 ));
                 $response = curl_exec($ch);
-                $remote_inbox_ctx = json_decode($response, true);
+                
 
                 // TODO
                 
@@ -260,6 +259,79 @@ class _GNUBOARD_ActivityPub {
     public static function open() {
         header("Content-Type: application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
     }
+
+    public static function webfinger() {
+        $params = array(
+            "resource" => $_GET['resource']
+        );
+
+        if (empty($params['resource'])) {
+            return activitypub_json_encode(array("message" => "Resource could not empty"));
+        }
+        
+        $resource = $params['resource'];
+        $resource_type = '';
+        $resource_value = '';
+        $pos = strpos($resource, ':');
+        if ($pos !== false) {
+            $resource_type = substr($resource, 0, $pos);
+            $resource_value = substr($resource, $pos + 1);
+        }
+        
+        switch($resource_type) {
+            case "acct":
+                // 값 분리
+                list($mb_id, $host) = explode('@', $resource_value);
+
+                // 호스트가 일치하지 않는 경우
+                if ($host != ACTIVITYPUB_HOST) {
+                    return activitypub_json_encode(array("message" => "Invalid host"));
+                }
+
+                // 회원 정보 확인
+                $mb = get_member($mb_id);
+                if (empty($mb['mb_id'])) {
+                    return activitypub_json_encode(array("message" => "Not registered user"));
+                }
+
+                // 응답 본문 생성
+                $context = array(
+                    "subject" => $params['resource'],
+                    "aliases" => array(
+                        activitypub_get_url("user", array("mb_id" => $mb['mb_id']))
+                    ),
+                    "links" => array(
+                        array(
+                            "rel" => "http://webfinger.net/rel/profile-page",
+                            "type" => "text/html",
+                            "href" => G5_BBS_URL . "/profile.php?mb_id=" . $mb['mb_id']
+                        ),
+                        array(
+                            "rel" => "self",
+                            "type" => "application/activity+json",
+                            "href" => activitypub_get_url("user", array("mb_id" => $mb['mb_id']))
+                        ),
+                        array(
+                            "rel" => "http://ostatus.org/schema/1.0/subscribe",
+                            "href" => activitypub_get_url("ostatus", array("mb_id" => $mb['mb_id'], "uri" => "{uri}"))
+                        )
+                    )
+                );
+                
+                // 응답 본문 출력
+                return activitypub_json_encode($context);
+
+                break;
+
+            case "http":
+                return activitypub_json_encode(array("message" => "Not implemented"));
+                break;
+                
+            default:
+                return activitypub_json_encode(array("message" => "Not supported resource type"));
+                break;
+        }
+    }
     
     public static function user() {
         $mb = get_member($_GET['mb_id']);
@@ -282,7 +354,7 @@ class _GNUBOARD_ActivityPub {
             "liked" => activitypub_get_url("liked", array("mb_id" => $mb['mb_id'])),
             "icon" => array(
                 activitypub_get_icon($mb)
-            )
+            ),
             "endpoints" => array(
                 "sharedInbox" => activitypub_get_url("inbox")
             )
@@ -598,6 +670,14 @@ class _GNUBOARD_ActivityPub {
 $route = $_GET['route'];
 
 switch ($route) {
+    // 액펍(ActivityPub)과 웹핑거(WebFinger)는 다른 개념이지만, 여기서는 액펍(ActivityPub) 전용으로 사용한다.
+    // 액펍(ActivityPub)에서 사용자를 조회하기 전단계에서 이뤄지는 요청이다.
+    case "activitypub.webfinger":
+        _GNUBOARD_ActivityPub::open();
+        echo _GNUBOARD_ActivityPub::webfinger();
+        _GNUBOARD_ActivityPub::close();
+        break;
+
     case "activitypub.user":
         _GNUBOARD_ActivityPub::open();
         echo _GNUBOARD_ActivityPub::user();
