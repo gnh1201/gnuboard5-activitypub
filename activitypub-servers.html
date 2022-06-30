@@ -3,18 +3,27 @@
         "platform": "gnuboard5",
         "user": "/?route=activitypub.user&mb_id=:username",
         "inbox": "/?route=activitypub.inbox",
-        "user-inbox": "/?route=activitypub.inbox&mb_id=:username"
+        "user-inbox": "/?route=activitypub.inbox&mb_id=:username",
+        "docs": [
+            "https://github.com/gnh1201/gnuboard5-activitypub"
+        ]
     },
     "mastodon.social": {
         "platform": "mastodon",
         "user": "/users/:username"
         "inbox": "/inbox",
-        "user-inbox": "/user/inbox/:username/inbox"
+        "user-inbox": "/user/inbox/:username/inbox",
+        "docs": [
+            "https://docs.joinmastodon.org/spec/activitypub/"
+        ]
     },
     "peertube.local": {
         "platform": "peertube",
         "user": "/accounts/:username",
         "inbox": "/inbox",
-        "user-inbox": "/accounts/:username/inbox"
+        "user-inbox": "/accounts/:username/inbox",
+        "docs": [
+            "https://docs.joinpeertube.org/api-rest-reference.html"
+        ]
     }
 }
