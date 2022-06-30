@@ -189,6 +189,9 @@ class _GNUBOARD_ActivityPub {
                 }
                 $mb = get_member($mb_id);
                 
+                // 수신자 확인
+                $to = $data['to'];
+
                 // 원글 정보 확인
                 $object = $data['object'];
 
@@ -199,7 +202,7 @@ class _GNUBOARD_ActivityPub {
                 $content = $object['content'];
 
                 // 답글인지 확인
-                if (!empty($object['inReplyTo']) {
+                if (!empty($object['inReplyTo'])) {
                     // 답글 정보 확인
                     $query = activitypub_parse_url($object['inReplyTo'])['query'];
 
@@ -209,6 +212,7 @@ class _GNUBOARD_ActivityPub {
                         $write_table = G5_TABLE_PREFIX . $query['bo_table'];
                         $wr = get_write($write_table, $wr_id);
 
+                        // 글이 존재하는 경우
                         if (!empty($wr['wr_id'])) {
                             $mb = get_member(ACTIVITYPUB_G5_USERNAME);
                             $wr_homepage = $data['actor'];
@@ -246,11 +250,26 @@ class _GNUBOARD_ActivityPub {
                             ";
                             sql_query($sql);
                         }
+
+                        // 원글이 삭제된 경우 오류를 기록 
+                        else {
+                            activitypub_add_memo(
+                                ACTIVITYPUB_G5_USERNAME,
+                                ACTIVITYPUB_G5_USERNAME,
+                                (
+                                    "[ERROR: Could not find the original message]\r\n\r\n" .
+                                    "From: " . $data['actor'] . "\r\n" .
+                                    "To: " . implode(", ", $to)  . "\r\n" .
+                                    $content .
+                                    "\r\n\r\n" .
+                                    G5_TIME_YMDHIS
+                                )
+                            );
+                        }
                     }
                 }
 
                 // 받을사람 처리
-                $to = $data['to'];
                 foreach($to as $_to) {
                     $query = activitypub_parse_url($_to)['query'];
 
