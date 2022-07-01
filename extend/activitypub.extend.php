@@ -8,6 +8,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://www.w3.org/TR/activitypub/
 //   * https://github.com/w3c/activitypub/issues/194
 //   * https://docs.joinmastodon.org/spec/webfinger/
+//   * https://organicdesign.nz/ActivityPub_Code
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
@@ -24,11 +25,11 @@ function activitypub_get_url($action, $params = array()) {
         return ACTIVITYPUB_URL . "/?route=activitypub." . $action . "&" . http_build_query($params);
     } else {
         return ACTIVITYPUB_URL . "/?route=activitypub." . $action;
-    }           
+    }
 }
 
 function activitypub_json_encode($arr) {
-    return json_encode( $arr );
+    return json_encode($arr);
 }
 
 function activitypub_get_icon($mb) {
@@ -299,7 +300,7 @@ function activitypub_parse_content($content) {
 
 function activitypub_add_post($data) {
     $wr_id = 0;
-    
+
     // 기본 파라미터
     $to = $data['to'];
     $object = $data['object'];
@@ -377,7 +378,7 @@ class _GNUBOARD_ActivityPub {
         );
 
         if (empty($params['resource'])) {
-            return activitypub_json_encode(array("message" => "Resource could not empty"));
+            return activitypub_json_encode(array("message" => "Resource could not be empty"));
         }
         
         $resource = $params['resource'];
@@ -504,7 +505,6 @@ class _GNUBOARD_ActivityPub {
 
         // 개인에게 보낸 메시지는 쪽지에 저장
         // 공개(Public) 설정한 메시지는 ACTIVITYPUB_G5_TABLENAME에 저장
-        // 게시물이 특정된 경우 댓글로 저장 (그누 전용)
 
         $data = json_decode(file_get_contents("php://input"), true);
 
@@ -533,11 +533,13 @@ class _GNUBOARD_ActivityPub {
             // 타입 별 해야될 일 지정
             switch ($data['type']) {
                 case "Create":
+                    // 스트링 및 오브젝트 타입을 모두 호환하도록 설정
+                    if (is_string($object))
+                        $object = array("id" => $object);
+
                     // 컨텐츠가 비어있는 경우
-                    if (empty($object['content'])) {
+                    if (empty($object['content']))
                         $object['content'] = "[NO CONTENT]";
-                        $data['object'] = $object;
-                    }
 
                     // 수신된 내용 등록
                     $activity_wr_id = activitypub_add_post($data);
@@ -552,15 +554,17 @@ class _GNUBOARD_ActivityPub {
                             $wr_id = $query['wr_id'];
                             $write_table = G5_TABLE_PREFIX . $query['bo_table'];
                             $wr = get_write($write_table, $wr_id);
+							$bo = get_board_db(ACTIVITYPUB_G5_BOARDNAME, true);
 
                             // 글이 존재하는 경우
                             if (!empty($wr['wr_id'])) {
                                 $mb = get_member(ACTIVITYPUB_G5_USERNAME);
                                 $wr_homepage = $data['actor'];
                                 $wr_content = sprintf(
-                                    "%s<br><br>[외부에서 달린 댓글입니다. 답은 <a href=\"%s\">여기</a>에서 하실 수 있습니다.]", 
+                                    "%s<br><br>[외부에서 달린 댓글입니다. 자세한 내용은 <a href=\"%s\">%s</a> 글을 확인하세요.]", 
                                     $content,
-                                    G5_BBS_URL . "/bbs/board.php?bo_table=" . ACTIVITYPUB_G5_BOARDNAME . "&wr_id=" . $activity_wr_id
+                                    G5_BBS_URL . "/bbs/board.php?bo_table=" . ACTIVITYPUB_G5_BOARDNAME . "&wr_id=" . $activity_wr_id,
+									$bo['bo_subject'] . " #" . $activity_wr_id
                                 );
 
                                 $sql = "
