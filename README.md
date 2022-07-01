@@ -16,3 +16,6 @@ ActivityPub implementation for GNUBOARD 5
 - [x] Followers
 - [x] Following
 - [x] Liked
+
+## 문의
+* gnh1201@gmail.com
