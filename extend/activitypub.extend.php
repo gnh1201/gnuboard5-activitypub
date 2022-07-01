@@ -15,7 +15,7 @@ define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN
 define("ACTIVITYPUB_URL", (empty(G5_URL) ? "http://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
 define("ACTIVITYPUB_G5_BOARDNAME", "apstreams");
-define("ACTIVITYPUB_G5_TABLENAME", G5_TABLE_PREFIX . ACTIVITYPUB_G5_BOARDNAME);
+define("ACTIVITYPUB_G5_TABLENAME", $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME);
 define("ACTIVITYPUB_G5_USERNAME", "apstreams");
 define("ACTIVITYPUB_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
@@ -309,7 +309,7 @@ function activitypub_add_post($inbox = "inbox", $data, $mb) {
 
     // 공개 설정이 없는 경우 비밀글로 설정
     $wr_option = '';
-    if (!in_array($to, NAMESPACE_ACTIVITYSTREAMS_PUBLIC))
+    if (!in_array(NAMESPACE_ACTIVITYSTREAMS_PUBLIC, $to))
         $wr_option = 'secret';
 
     // 게시글로 등록
@@ -377,6 +377,8 @@ function activitypub_add_post($inbox = "inbox", $data, $mb) {
                 wr_10 = ''
     ";
     sql_query($sql);
+    
+    echo $sql;
     
     $wr_id = sql_insert_id();
 
@@ -585,8 +587,13 @@ class _GNUBOARD_ActivityPub {
                             if (empty($object['content']))
                                 $object['content'] = "[NO CONTENT]";
 
+
                             // 수신된 내용 등록
                             $activity_wr_id = activitypub_add_post("inbox", $data, $mb);
+                            
+                            // 컨텐츠 설정
+                            $bo = get_board_db(ACTIVITYPUB_G5_BOARDNAME, true);
+                            $content = sprintf("%s\r\n\r\n[외부에서 전송된 글입니다. 자세한 내용은 %s#%s 글을 확인하세요.]", $object['content'], $bo['bo_subject'], $activity_wr_id);
 
                             // 답글인지 확인
                             if (!empty($object['inReplyTo'])) {
@@ -598,18 +605,11 @@ class _GNUBOARD_ActivityPub {
                                     $wr_id = $query['wr_id'];
                                     $write_table = G5_TABLE_PREFIX . $query['bo_table'];
                                     $wr = get_write($write_table, $wr_id);
-                                    $bo = get_board_db(ACTIVITYPUB_G5_BOARDNAME, true);
 
                                     // 글이 존재하는 경우
                                     if (!empty($wr['wr_id'])) {
                                         $mb = get_member(ACTIVITYPUB_G5_USERNAME);
                                         $wr_homepage = $data['actor'];
-                                        $wr_content = sprintf(
-                                            "%s<br><br>[외부에서 달린 댓글입니다. 자세한 내용은 <a href=\"%s\">%s</a> 글을 확인하세요.]", 
-                                            $content,
-                                            G5_BBS_URL . "/bbs/board.php?bo_table=" . ACTIVITYPUB_G5_BOARDNAME . "&wr_id=" . $activity_wr_id,
-                                            $bo['bo_subject'] . " #" . $activity_wr_id
-                                        );
 
                                         $sql = "
                                             insert into $write_table
@@ -622,7 +622,7 @@ class _GNUBOARD_ActivityPub {
                                                      wr_comment = '',
                                                      wr_comment_reply = '',
                                                      wr_subject = '',
-                                                     wr_content = '$wr_content',
+                                                     wr_content = '$content',
                                                      mb_id = '{$mb['mb_id']}',
                                                      wr_password = '',
                                                      wr_name = '{$mb['mb_name']}',
