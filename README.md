@@ -9,10 +9,10 @@ ActivityPub implementation for GNUBOARD 5
   * `apstreams` 사용자 추가
 
 ## 작업진행
-[x] WebFinder
-[x] User
-[x] Inbox
-[ ] Outbox (In working)
-[x] Followers
-[x] Following
-[x] Liked
+- [x] WebFinder
+- [x] User
+- [x] Inbox
+- [ ] Outbox (In working)
+- [x] Followers
+- [x] Following
+- [x] Liked
