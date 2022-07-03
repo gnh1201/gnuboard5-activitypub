@@ -11,6 +11,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://github.com/w3c/activitypub/issues/194
 //   * https://docs.joinmastodon.org/spec/webfinger/
 //   * https://organicdesign.nz/ActivityPub_Code
+//   * https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
