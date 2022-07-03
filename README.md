@@ -3,6 +3,9 @@ ActivityPub implementation for GNUBOARD 5
 
 ## W3C Documentation
   * https://www.w3.org/TR/activitypub/
+  * https://github.com/w3c/activitypub/issues/194
+  * https://docs.joinmastodon.org/spec/webfinger/
+  * https://organicdesign.nz/ActivityPub_Code
 
 ## 사용 전 설정
   * `apstreams` 게시판 추가
@@ -12,7 +15,7 @@ ActivityPub implementation for GNUBOARD 5
 - [x] WebFinger
 - [x] User
 - [x] Inbox
-- [ ] Outbox (In working)
+- [x] Outbox
 - [x] Followers
 - [x] Following
 - [x] Liked
