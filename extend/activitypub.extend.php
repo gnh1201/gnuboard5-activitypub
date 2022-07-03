@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-03 (version 0.1)
+// 2022-07-03 (version 0.1.2)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -192,7 +192,7 @@ function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIV
     $terms = activitypub_parse_content($content);
 
     // 수신자/내용 생성
-    $to = array();
+    $to = array(NAMESPACE_ACTIVITYSTREAMS_PUBLIC);
     $content = "";
     foreach($terms as $term_ctx) {
         switch ($term_ctx['type']) {
@@ -252,6 +252,9 @@ function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIV
 
     // 수신자 작업
     foreach($to as $_to) {
+        // 네임스페이스인 경우 건너뛰기
+        if ($_to == NAMESPACE_ACTIVITYSTREAMS_PUBLIC) continue;
+
         // 수신자 정보 파싱
         $url_ctx = activitypub_parse_url($_to);
 
@@ -268,7 +271,7 @@ function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIV
         }
 
         // inbox로 데이터 전송
-        array_push($response, activitypub_http_post($remote_inbox_url, $rawdata));
+        activitypub_http_post($remote_inbox_url, $rawdata);
     }
 
     return $data;
