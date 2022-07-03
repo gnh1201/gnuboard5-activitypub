@@ -209,9 +209,6 @@ function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIV
                     if ($webfigner_ctx['subject'] != ("acct:" . $alias)) {
                         $webfigner_ctx = activitypub_http_get("http://" . $host . "/?route=webfinger&acct=" . $alias);
                     }
-                    
-                    var_dump($webfigner_ctx);
-                    exit;
 
                     // 한번 더 확인
                     if ($webfigner_ctx['subject'] != ("acct:" . $alias)) break;
