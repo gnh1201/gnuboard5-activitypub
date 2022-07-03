@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-04 (version 0.1.5)
+// 2022-07-04 (version 0.1.6)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -30,7 +30,7 @@ function activitypub_json_encode($arr) {
 }
 
 function activitypub_json_decode($arr) {
-    return json_decode($arr);
+    return json_decode($arr, true);
 }
 
 function activitypub_get_access_tokens() {
