@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-04 (version 0.1.7-dev)
+// 2022-07-04 (version 0.1.7)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -394,7 +394,7 @@ function activitypub_parse_content($content) {
             $expr = substr($content, $pos);
         }
 
-        // EXAMPLE: @username@target.example.org
+        // EXAMPLE: @username@server1.example.org
         if (substr($expr, 0, 1) == '@' && strpos(substr($expr, 1), '@') !== false) {
             array_push($entities, array("type" => "account", "value" => $expr));
         } else if (substr($expr, 0, 1) == '#') {
@@ -477,7 +477,7 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
                 wr_nogood = 0,
                 mb_id = '{$mb['mb_id']}',
                 wr_password = '',
-                wr_name = '{$mb['mb_name']}',
+                wr_name = '{$mb['mb_nick']}',
                 wr_email = '',
                 wr_homepage = '$wr_homepage',
                 wr_datetime = '" . G5_TIME_YMDHIS . "',
@@ -760,7 +760,7 @@ class _GNUBOARD_ActivityPub {
                                                      wr_content = '$content',
                                                      mb_id = '{$mb['mb_id']}',
                                                      wr_password = '',
-                                                     wr_name = '{$mb['mb_name']}',
+                                                     wr_name = '{$mb['mb_nick']}',
                                                      wr_email = '',
                                                      wr_homepage = '$wr_homepage',
                                                      wr_datetime = '" . G5_TIME_YMDHIS . "',
