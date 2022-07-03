@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-04 (version 0.1.7)
+// 2022-07-04 (version 0.1.8)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -20,7 +20,7 @@ define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
 define("ACTIVITYPUB_G5_BOARDNAME", "apstreams");
 define("ACTIVITYPUB_G5_TABLENAME", $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME);
 define("ACTIVITYPUB_G5_USERNAME", "apstreams");
-define("ACTIVITYPUB_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
+define("ACTIVITYPUB_G5_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;");
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
@@ -453,8 +453,8 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
             array_push($receivers, $query['mb_id']);
         }
     }
-    $wr_7 = implode($receivers);
-    
+    $wr_7 = implode(',', $receivers);
+
     // 외부에 발행되었는지 여부 ('published')
     $wr_8 = '';
 
@@ -533,32 +533,34 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
     return $wr_id;
 }
 
-function activitypub_get_activities($mb_id = '', $inbox = "inbox") {
+function activitypub_get_activities($inbox = "inbox", $mb_id = '') {
+    global $g5;
+    
+    // 반환할 변수
     $activities = array();
 
     // 정보 불러오기
     $sql = "";
     if(empty($mb_id)) {
-        $sql = "select wr_content from " . ACTIVITYPUB_G5_TABLENAME . "
+        $sql = "select wr_id from " . ACTIVITYPUB_G5_TABLENAME . "
             where ca_name = '$inbox'
-                and wr_datetime BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_NEW_DAYS . " DAY AND CURDATE()
+                and DATE(wr_datetime) BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_NEW_DAYS . " DAY AND CURDATE()
         ";
     } else {
-        $sql = "select wr_content from " . ACTIVITYPUB_G5_TABLENAME . "
+        $sql = "select wr_id from " . ACTIVITYPUB_G5_TABLENAME . "
             where ca_name = '$inbox'
                 and FIND_IN_SET('$mb_id', wr_7) > 0
-                and wr_datetime BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_NEW_DAYS . " DAY AND CURDATE()
+                and DATE(wr_datetime) BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_NEW_DAYS . " DAY AND CURDATE()
         ";
-        $result = sql_query($sql);
     }
     $result = sql_query($sql);
 
     // 정보 조회 후 처리
     while ($row = sql_fetch_array($result)) {
-        $sql2 = "select * from {$g4['board_file_table']}
-            where bo_table = '" . ACTIVITYPUB_G5_TABLENAME . "' and wr_id = '{$row['wr_id']}' and bf_content = 'application/activity+json'";
+        $sql2 = "select * from {$g5['board_file_table']}
+            where bo_table = '" . ACTIVITYPUB_G5_BOARDNAME . "' and wr_id = '{$row['wr_id']}' and bf_content = 'application/activity+json'";
         $result2 = sql_query($sql2);
-        while ($row2 = sql_fetch_array($result)) {
+        while ($row2 = sql_fetch_array($result2)) {
             $filename = $row2['bf_file'];
             $filepath = G5_DATA_PATH . "/file/" . ACTIVITYPUB_G5_BOARDNAME . "/" . $filename;
             if(file_exists($filepath)) {
@@ -917,7 +919,8 @@ class _GNUBOARD_ActivityPub {
                 return activitypub_json_encode(array("message" => "Success"));
 
             case "GET":
-                return activitypub_json_encode(activitypub_get_activities("inbox", $_GET['mb_id']));
+                $mb = get_member($_GET['mb_id']);
+                return activitypub_json_encode(activitypub_get_activities("inbox", $mb['mb_id']));
 
             default:
                 return activitypub_json_encode(array("message" => "Not supported method"));
@@ -935,7 +938,8 @@ class _GNUBOARD_ActivityPub {
 
             // 가장 최근의 활동을 가져옴
             case "GET":
-                return activitypub_json_encode(activitypub_get_activities("outbox", $_GET['mb_id']));
+                $mb = get_member($_GET['mb_id']);
+                return activitypub_json_encode(activitypub_get_activities("outbox", $mb['mb_id']));
         }
     }
 
