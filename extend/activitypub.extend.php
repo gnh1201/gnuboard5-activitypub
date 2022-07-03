@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-03 (version 0.1.2)
+// 2022-07-04 (version 0.1.4)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -153,30 +153,62 @@ function activitypub_set_liked($good, $bo_table, $wr_id) {
     sql_query(" insert {$g5['board_good_table']} set bo_table = '{$bo_table}', wr_id = '{$wr_id}', mb_id = '" . ACTIVITYPUB_G5_USERNAME . "', bg_flag = '{$good}', bg_datetime = '" . G5_TIME_YMDHIS . "' ");
 }
 
-function activitypub_http_get($url, $access_token) {
+function activitypub_http_noheader_get($url, $access_token = '') {
+    $headers = array();
+    if (!empty($access_token)) {
+        $headers["Authorization"] = "Bearer " . $access_token;
+    }
+
+    $ch = curl_init();
+    curl_setopt_array($ch, array(
+        CURLOPT_URL => $url,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_RETURNTRANSFER => true
+    ));
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    return json_decode($response, true);
+}
+
+function activitypub_http_get($url, $access_token = '') {
+    $headers = array("Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
+    if (!empty($access_token)) {
+        $headers["Authorization"] = "Bearer " . $access_token;
+    }
+
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
         CURLOPT_HTTPHEADER => array(
-            "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
-            "Authorization" => "Bearer " . $access_token
+            "Accept" => $headers
         ),
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true
     ));
     $response = curl_exec($ch);
-    return json_decode(curl_exec($ch), true);
+    curl_close($ch);
+
+    // 일부 서버는 ActivityPub을 위한 Accept 헤더를 해석하지 못함
+    if (strpos($response, "<title>400 Bad Request</title>") !== false)
+        return activitypub_http_noheader_get($url, $access_token);
+
+    return json_decode($response, true);
 }
 
-function activitypub_http_post($url, $rawdata, $access_token) {
+function activitypub_http_noheader_post($url, $rawdata, $access_token = '') {
+    $headers = array();
+    if (!empty($access_token)) {
+        $headers["Authorization"] = "Bearer " . $access_token;
+    }
+
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
-        CURLOPT_HTTPHEADER => array(
-            "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
-            "Authorization" => "Bearer " . $access_token
-        ),
+        CURLOPT_HTTPHEADER => $headers,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true,
@@ -184,7 +216,35 @@ function activitypub_http_post($url, $rawdata, $access_token) {
         CURLOPT_POST => true
     ));
     $response = curl_exec($ch);
-    return json_decode(curl_exec($ch), true);
+    curl_close($ch);
+
+    return json_decode($response, true);
+}
+
+function activitypub_http_post($url, $rawdata, $access_token = '') {
+    $headers = array("Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
+    if (!empty($access_token)) {
+        $headers["Authorization"] = "Bearer " . $access_token;
+    }
+
+    $ch = curl_init();
+    curl_setopt_array($ch, array(
+        CURLOPT_URL => $url,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POSTFIELDS => $rawdata,
+        CURLOPT_POST => true
+    ));
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    // 일부 서버는 ActivityPub을 위한 Accept 헤더를 해석하지 못함
+    if (strpos($response, "<title>400 Bad Request</title>") !== false)
+        return activitypub_http_noheader_post($url, $rawdata, $access_token);
+    
+    return json_decode($response, true);
 }
 
 function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIVITYPUB_G5_USERNAME)) {
@@ -199,19 +259,19 @@ function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIV
             case "account":
                 // WebFinger 정보 수신
                 $account = substr($term_ctx['value'], 1);
-                $account_ctx = explode('@', $account);
-                if (count($account_ctx) == 2) {
-                    list($username, $host) = $account_ctx;
-                    // 공통 WebFinger에 연결
-                    $webfigner_ctx = activitypub_http_get("http://" . $host . "/.well-known/webfinger?acct=" . $alias);
+                $account_terms = explode('@', $account);
+                $account_ctx = array("username" => $account_terms[0], "host" => $account_terms[1]);
+                if (!empty($account_ctx['host'])) {
+                    // 그누5 전용 WebFinger에 우선적으로 연결
+                    $webfigner_ctx = activitypub_http_get("http://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
 
-                    // 실패시, 그누5 전용 WebFinger에 연결
-                    if ($webfigner_ctx['subject'] != ("acct:" . $alias)) {
-                        $webfigner_ctx = activitypub_http_get("http://" . $host . "/?route=webfinger&acct=" . $alias);
+                    // 실패시, 공통 WebFinger에 연결
+                    if ($webfigner_ctx['subject'] != ("acct:" . $account)) {
+                        $webfigner_ctx = activitypub_http_get("http://" . $account_ctx['host'] . "/.well-known/webfinger?resource=acct:" . $account);
                     }
 
                     // 한번 더 확인
-                    if ($webfigner_ctx['subject'] != ("acct:" . $alias)) break;
+                    if ($webfigner_ctx['subject'] != ("acct:" . $account)) break;
 
                     // 받은 요청으로 처리
                     $webfigner_links = $webfigner_ctx['links'];
@@ -255,8 +315,8 @@ function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIV
         // 네임스페이스인 경우 건너뛰기
         if ($_to == NAMESPACE_ACTIVITYSTREAMS_PUBLIC) continue;
 
-        // 수신자 정보 파싱
-        $url_ctx = activitypub_parse_url($_to);
+        // 수신자 정보 조회
+        $remote_user_ctx = activitypub_http_get($_to);
 
         // inbox 주소 찾기
         $remote_inbox_url = $remote_user_ctx['inbox'];
@@ -271,7 +331,7 @@ function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIV
         }
 
         // inbox로 데이터 전송
-        activitypub_http_post($remote_inbox_url, $rawdata);
+        $response = activitypub_http_post($remote_inbox_url, $rawdata);
     }
 
     return $data;
@@ -306,7 +366,8 @@ function activitypub_parse_content($content) {
             $expr = substr($content, $pos);
         }
 
-        if (substr($expr, 0, 1) == '@') {
+        // EXAMPLE: @username@target.example.org
+        if (substr($expr, 0, 1) == '@' && strpos(substr($expr, 1), '@') !== false) {
             array_push($entities, array("type" => "account", "value" => $expr));
         } else if (substr($expr, 0, 1) == '#') {
             array_push($entities, array("type" => "hashtag", "value" => $expr));
