@@ -6,6 +6,7 @@ ActivityPub implementation for GNUBOARD 5
   * https://github.com/w3c/activitypub/issues/194
   * https://docs.joinmastodon.org/spec/webfinger/
   * https://organicdesign.nz/ActivityPub_Code
+  * https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
 
 ## 사용 전 설정
   * `apstreams` 게시판 추가
