@@ -909,7 +909,7 @@ switch ($route) {
     //
     //     <IfModule mod_rewrite.c>
     //         RewriteEngine on
-    //         RewriteRule ^\.well-known/webfinger /?route=activitypub.webfinger [QSA,L]
+    //         RewriteRule ^\.well-known/webfinger /?route=webfinger [QSA,L]
     //     </IfModule>
     //
     // Reference: https://wordpress.org/support/topic/htaccess-conflict/
