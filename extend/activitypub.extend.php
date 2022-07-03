@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-04 (version 0.1.4)
+// 2022-07-04 (version 0.1.5)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -21,8 +21,29 @@ define("ACTIVITYPUB_G5_BOARDNAME", "apstreams");
 define("ACTIVITYPUB_G5_TABLENAME", $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME);
 define("ACTIVITYPUB_G5_USERNAME", "apstreams");
 define("ACTIVITYPUB_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
+define("ACTIVITYPUB_ACCESS_TOKEN", "mastodon.social=;");  // e,g. server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
+
+function activitypub_json_encode($arr) {
+    return json_encode($arr);
+}
+
+function activitypub_json_decode($arr) {
+    return json_decode($arr);
+}
+
+function activitypub_get_access_tokens() {
+    $_access_tokens = array();
+
+    $terms = array_filter(map("trim", explode(";", ACTIVITYPUB_ACCESS_TOKEN)));
+    foreach($terms as $term) {
+        list($k, $v) = explode('=', $term);
+        $_access_tokens[$k] = $v;
+    }
+
+    return $_access_tokens;
+};
 
 function activitypub_get_url($action, $params = array()) {
     if (count(array_keys($params)) > 0) {
@@ -30,10 +51,6 @@ function activitypub_get_url($action, $params = array()) {
     } else {
         return ACTIVITYPUB_URL . "/?route=activitypub." . $action;
     }
-}
-
-function activitypub_json_encode($arr) {
-    return json_encode($arr);
 }
 
 function activitypub_get_icon($mb) {
@@ -170,7 +187,7 @@ function activitypub_http_noheader_get($url, $access_token = '') {
     $response = curl_exec($ch);
     curl_close($ch);
 
-    return json_decode($response, true);
+    return activitypub_json_decode($response, true);
 }
 
 function activitypub_http_get($url, $access_token = '') {
@@ -196,7 +213,7 @@ function activitypub_http_get($url, $access_token = '') {
     if (strpos($response, "<title>400 Bad Request</title>") !== false)
         return activitypub_http_noheader_get($url, $access_token);
 
-    return json_decode($response, true);
+    return activitypub_json_decode($response, true);
 }
 
 function activitypub_http_noheader_post($url, $rawdata, $access_token = '') {
@@ -218,7 +235,7 @@ function activitypub_http_noheader_post($url, $rawdata, $access_token = '') {
     $response = curl_exec($ch);
     curl_close($ch);
 
-    return json_decode($response, true);
+    return activitypub_json_decode($response, true);
 }
 
 function activitypub_http_post($url, $rawdata, $access_token = '') {
@@ -244,7 +261,7 @@ function activitypub_http_post($url, $rawdata, $access_token = '') {
     if (strpos($response, "<title>400 Bad Request</title>") !== false)
         return activitypub_http_noheader_post($url, $rawdata, $access_token);
     
-    return json_decode($response, true);
+    return activitypub_json_decode($response, true);
 }
 
 function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIVITYPUB_G5_USERNAME)) {
@@ -311,8 +328,9 @@ function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIV
     $rawdata = activitypub_json_encode($data);
 
     // 수신자 작업
+    
     foreach($to as $_to) {
-        // 네임스페이스인 경우 건너뛰기
+        // 공개 네임스페이스인 경우 건너뛰기
         if ($_to == NAMESPACE_ACTIVITYSTREAMS_PUBLIC) continue;
 
         // 수신자 정보 조회
@@ -330,8 +348,18 @@ function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIV
             continue;
         }
 
+        // 엑세스 토큰(Access Token)이 존재하는 목적지인 경우
+        $access_token = '';
+        $_access_tokens = activitypub_get_access_tokens();
+        foreach($_access_tokens as $k=>$v) {
+            if(strpos($_to, "http://" . $k . "/") !== false || strpos($_to, "https://" . $k . "/") !== false) {
+                $access_token = $v;
+                break;
+            }
+        }
+
         // inbox로 데이터 전송
-        $response = activitypub_http_post($remote_inbox_url, $rawdata);
+        $response = activitypub_http_post($remote_inbox_url, $rawdata, $access_token);
     }
 
     return $data;
@@ -534,7 +562,7 @@ function activitypub_get_activities($mb_id = '', $inbox = "inbox") {
             $filename = $row2['bf_file'];
             $filepath = G5_DATA_PATH . "/file/" . ACTIVITYPUB_G5_BOARDNAME . "/" . $filename;
             if(file_exists($filepath)) {
-                array_push($activities, json_decode(file_get_contents($filepath), true));
+                array_push($activities, activitypub_json_decode(file_get_contents($filepath), true));
             }
         }
     }
@@ -659,7 +687,7 @@ class _GNUBOARD_ActivityPub {
             case "POST":
                 // 개인에게 보낸 메시지는 쪽지에 저장
                 // 공개(Public) 설정한 메시지는 ACTIVITYPUB_G5_TABLENAME에 저장
-                $data = json_decode(file_get_contents("php://input"), true);
+                $data = activitypub_json_decode(file_get_contents("php://input"), true);
 
                 if (empty($data['@context'])) {
                     return activitypub_json_encode(array("message" => "This is a broken context"));
