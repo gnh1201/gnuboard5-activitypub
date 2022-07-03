@@ -36,7 +36,7 @@ function activitypub_json_decode($arr) {
 function activitypub_get_access_tokens() {
     $_access_tokens = array();
 
-    $terms = array_filter(map("trim", explode(";", ACTIVITYPUB_ACCESS_TOKEN)));
+    $terms = array_filter(array_map("trim", explode(";", ACTIVITYPUB_ACCESS_TOKEN)));
     foreach($terms as $term) {
         list($k, $v) = explode('=', $term);
         $_access_tokens[$k] = $v;
