@@ -21,7 +21,7 @@ define("ACTIVITYPUB_G5_BOARDNAME", "apstreams");
 define("ACTIVITYPUB_G5_TABLENAME", $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME);
 define("ACTIVITYPUB_G5_USERNAME", "apstreams");
 define("ACTIVITYPUB_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
-define("ACTIVITYPUB_ACCESS_TOKEN", "mastodon.social=;");  // e,g. server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;
+define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;");
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
 
