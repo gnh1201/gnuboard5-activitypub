@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-04 (version 0.1.8)
+// 2022-07-04 (version 0.1.9-dev)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -264,7 +264,7 @@ function activitypub_http_post($url, $rawdata, $access_token = '') {
     return activitypub_json_decode($response, true);
 }
 
-function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIVITYPUB_G5_USERNAME)) {
+function activitypub_publish_content($content, $id, $mb, $_object = array()) {
     // 컨텐츠 파싱
     $terms = activitypub_parse_content($content);
 
@@ -307,12 +307,12 @@ function activitypub_publish_content($content, $id, $mb = array("mb_id" => ACTIV
     }
 
     // 전문 생성
-    $object = array(
+    $object = array_merge(array(
         "type" => "Note",
         "id" => $id,
         "attributedTo" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
         "content" => $content
-    );
+    ), $_object);
 
     // 외부로 보낼 전문 생성
     $data = array(
@@ -963,27 +963,6 @@ class _GNUBOARD_ActivityPub {
 }
 
 // 훅(Hook) 등록
-function _activitypub_hook_write_update($board, $wr_id) {
-    global $g5, $member;
-
-    // 본문 가져오기
-    $sql = "select wr_id, wr_content from {$g5['write_prefix']}{$board['bo_table']} where wr_id = '{$wr_id}'";
-    $row = sql_fetch($sql);
-    if (empty($row['wr_id'])) return;
-
-    // 글 전송하기
-    $data = activitypub_publish_content(
-        $row['wr_content'],
-        G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}"
-    );
-    
-    // 현재 로그인되어 있으면, 로그인된 계정의 정보를 따름
-    if (!empty($member['mb_id'])) {
-        activitypub_add_activity("outbox", $data, $member);
-    } else {
-        activitypub_add_activity("outbox", $data, get_member(ACTIVITYPUB_G5_USERNAME));
-    }
-}
 
 function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redirect_url, $me_memo) {
     global $member;
@@ -991,26 +970,85 @@ function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redi
     // 'apstreams' 계정이 있는지 확인
     if (!in_array(ACTIVITYPUB_G5_USERNAME, $member_list['id'])) return;
 
-    // 글 전송하기
-    $data = activitypub_publish_content(
-        $me_memo,
-        activitypub_get_url("user", array("mb_id" => $member['mb_id']))
-    );
-
     // 현재 로그인되어 있으면, 로그인된 계정의 정보를 따름
     if (!empty($member['mb_id'])) {
+        // 글 전송하기
+        $data = activitypub_publish_content(
+            $me_memo,
+            activitypub_get_url("user", array("mb_id" => $member['mb_id'])),
+            $member
+        );
         activitypub_add_activity("outbox", $data, $member);
     } else {
-        activitypub_add_activity("outbox", $data, get_member(ACTIVITYPUB_G5_USERNAME));
+        // 글 전송하기
+        $mb = get_member(ACTIVITYPUB_G5_USERNAME);
+        $data = activitypub_publish_content(
+            $me_memo,
+            activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
+            $mb
+        );
+        activitypub_add_activity("outbox", $data, $mb);
     }
 }
 
 function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_url) {
-    _activitypub_hook_write_update($board, $wr_id);
+    global $g5, $member;
+
+    // 본문 가져오기
+    $sql = "select wr_id, wr_content from {$g5['write_prefix']}{$board['bo_table']} where wr_id = '{$wr_id}'";
+    $row = sql_fetch($sql);
+    if (empty($row['wr_id'])) return;
+
+    // 현재 로그인되어 있으면, 로그인된 계정의 정보를 따름
+    if (!empty($member['mb_id'])) {
+        // 글 전송하기
+        $data = activitypub_publish_content(
+            $row['wr_content'],
+            G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
+            $member
+        );
+        activitypub_add_activity("outbox", $data, $member);
+    } else {
+        // 글 전송하기
+        $mb = get_member(ACTIVITYPUB_G5_USERNAME);
+        $data = activitypub_publish_content(
+            $row['wr_content'],
+            G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
+            $mb
+        );
+        activitypub_add_activity("outbox", $data, $mb);
+    }
 }
 
 function _activitypub_comment_update_after($board, $wr_id, $w, $qstr, $redirect_url, $comment_id, $reply_array) {
-    _activitypub_hook_write_update($board, $wr_id);
+    global $g5, $member;
+
+    // 본문(댓글) 가져오기
+    $sql = "select wr_id, wr_parent, wr_content from {$g5['write_prefix']}{$board['bo_table']} where wr_id = '{$comment_id}'";
+    $row = sql_fetch($sql);
+    if (empty($row['wr_id'])) return;
+
+    // 현재 로그인되어 있으면, 로그인된 계정의 정보를 따름
+    if (!empty($member['mb_id'])) {
+        // 글 전송하기
+        $data = activitypub_publish_content(
+            $row['wr_content'],
+            G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_parent']}&c_id=" . $comment_id,
+            $member,
+            array("inReplyTo" => G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}")
+        );
+        activitypub_add_activity("outbox", $data, $member);
+    } else {
+        // 글 전송하기
+        $mb = get_member(ACTIVITYPUB_G5_USERNAME);
+        $data = activitypub_publish_content(
+            $row['wr_content'],
+            G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_parent']}&c_id=" . $comment_id,
+            $mb,
+            array("inReplyTo" => G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}")
+        );
+        activitypub_add_activity("outbox", $data, $mb);
+    }
 }
 
 add_event("write_update_after", "_activitypub_write_update_after", 0, 5);
