@@ -455,9 +455,7 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
     }
     $wr_7 = implode(',', $receivers);
 
-    // 외부에 발행되었는지 여부 ('published')
-    $wr_8 = '';
-
+    // 게시글로 등록
     $sql = "
         insert into $write_table
             set wr_num = '$wr_num',
@@ -490,7 +488,7 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
                 wr_5 = '',
                 wr_6 = '$wr_6',
                 wr_7 = '$wr_7',
-                wr_8 = '$wr_8',
+                wr_8 = '',
                 wr_9 = '',
                 wr_10 = ''
     ";
