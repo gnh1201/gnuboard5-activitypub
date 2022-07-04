@@ -264,12 +264,12 @@ function activitypub_http_post($url, $rawdata, $access_token = '') {
     return activitypub_json_decode($response, true);
 }
 
-function activitypub_publish_content($content, $id, $mb, $_object = array()) {
+function activitypub_publish_content($content, $id, $mb, $_object = array(), $_added_to = array()) {
     // 컨텐츠 파싱
     $terms = activitypub_parse_content($content);
 
     // 수신자/내용 생성
-    $to = array(NAMESPACE_ACTIVITYSTREAMS_PUBLIC);
+    $to = array_merge(array(NAMESPACE_ACTIVITYSTREAMS_PUBLIC), $_added_to);
     $content = "";
     foreach($terms as $term_ctx) {
         switch ($term_ctx['type']) {
@@ -328,7 +328,6 @@ function activitypub_publish_content($content, $id, $mb, $_object = array()) {
     $rawdata = activitypub_json_encode($data);
 
     // 수신자 작업
-    
     foreach($to as $_to) {
         // 공개 네임스페이스인 경우 건너뛰기
         if ($_to == NAMESPACE_ACTIVITYSTREAMS_PUBLIC) continue;
@@ -383,7 +382,6 @@ function activitypub_parse_content($content) {
     };
 
     $pos = $get_next_position($pos);
-
     while ($pos !== false) {
         $end = strpos($content, ' ', $pos + 1);
 
@@ -403,10 +401,11 @@ function activitypub_parse_content($content) {
             array_push($entities, array("type" => "url", "value" => $expr));
         }
 
-        array_push($entities, array("type" => "fulltext", "value" => $content));
-
         $pos = $get_next_position($pos);
     }
+    
+    // 전체 텍스트 추가
+    array_push($entities, array("type" => "fulltext", "value" => $content));
     
     return $entities;
 }
