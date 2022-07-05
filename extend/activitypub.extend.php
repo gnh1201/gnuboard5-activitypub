@@ -8,10 +8,13 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
+//   * https://www.w3.org/TR/activitystreams-core/
+//   * https://www.w3.org/TR/activitystreams-vocabulary/
 //   * https://github.com/w3c/activitypub/issues/194
 //   * https://docs.joinmastodon.org/spec/webfinger/
 //   * https://organicdesign.nz/ActivityPub_Code
 //   * https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
+//   * https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
@@ -24,6 +27,7 @@ define("ACTIVITYPUB_G5_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;");
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
+define("ACTIVITYPUB_ENABLE_GEOLOCATION", true);
 
 function activitypub_json_encode($arr) {
     return json_encode($arr);
@@ -264,7 +268,7 @@ function activitypub_http_post($url, $rawdata, $access_token = '') {
     return activitypub_json_decode($response, true);
 }
 
-function activitypub_publish_content($content, $id, $mb, $_object = array(), $_added_to = array()) {
+function activitypub_publish_content($content, $id, $mb, $_added_object = array(), $_added_to = array()) {
     // 컨텐츠 파싱
     $terms = activitypub_parse_content($content);
 
@@ -306,13 +310,34 @@ function activitypub_publish_content($content, $id, $mb, $_object = array(), $_a
         }
     }
 
-    // 전문 생성
-    $object = array_merge(array(
+    // 전문 생성 시작
+    $object = array(
         "type" => "Note",
+        "generator" => "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: " . ACTIVITYPUB_INSTANCE_ID . ")",
         "id" => $id,
         "attributedTo" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
-        "content" => $content
-    ), $_object);
+        "content" => $content,
+        "icon" => activitypub_get_icon($mb)
+    );
+
+    // 위치정보가 활성화되어 있으면
+    if (ACTIVITYPUB_ENABLE_GEOLOCATION) {
+        /*
+        $object = array_merge($object, array(
+            "location" => array(
+                "name" => "",
+                "type" => "Place",
+                "longitude" => 12.34,
+                "latitude" => 56.78,
+                "altitude" => 90,
+                "units" => "m"
+            )
+        ));
+        */
+    }
+
+    // 전문 생성 완료
+    $object = array_merge($object, $_added_object);
 
     // 외부로 보낼 전문 생성
     $data = array(
@@ -454,7 +479,7 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
     }
     $wr_7 = implode(',', $receivers);
 
-    // 상태 저장
+    // 상태 작업
     //  * 주어진 임무를 진행하기 전이라면: draft
     //  * 일을 저지른 뒤라면: published
     $wr_8 = $status;
@@ -499,6 +524,13 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
     sql_query($sql);
     $wr_id = sql_insert_id();
 
+    // 저장 전 데이터 처리
+    $now_utc_tz = str_replace('+00:00', 'Z', gmdate('c'));
+    if ($status == "published") {
+        $data['published'] = $now_utc_tz;
+    }
+    $data['updated'] = $now_utc_tz;
+
     // 요청 전문은 파일로 저장
     $raw_context = activitypub_json_encode($data);
     $time_ms = floor(microtime(true) * 1000);
@@ -535,11 +567,10 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
     return $wr_id;
 }
 
-function activitypub_get_activities($inbox = "inbox", $mb_id = '') {
+function activitypub_get_objects($inbox = "inbox", $mb_id = '') {
     global $g5;
-    
-    // 반환할 변수
-    $activities = array();
+
+    $items = array();
 
     // 정보 불러오기
     $sql = "";
@@ -566,12 +597,21 @@ function activitypub_get_activities($inbox = "inbox", $mb_id = '') {
             $filename = $row2['bf_file'];
             $filepath = G5_DATA_PATH . "/file/" . ACTIVITYPUB_G5_BOARDNAME . "/" . $filename;
             if(file_exists($filepath)) {
-                array_push($activities, activitypub_json_decode(file_get_contents($filepath), true));
+                array_push($items, activitypub_json_decode(file_get_contents($filepath))['object']);
             }
         }
     }
+    
+    // 전문 만들기
+    $context = array(
+        "@context" => NAMESPACE_ACTIVITYSTREAMS,
+        "summary" => "Latest items",
+        "type" => "Collection",
+        "totalItems" => count($items),
+        "items" => $items
+    );
 
-    return $activities;
+    return $context;
 }
 
 class _GNUBOARD_ActivityPub {
