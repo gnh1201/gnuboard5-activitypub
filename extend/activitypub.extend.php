@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-04 (version 0.1.9-dev)
+// 2022-07-04 (version 0.1.10-dev)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -410,7 +410,7 @@ function activitypub_parse_content($content) {
     return $entities;
 }
 
-function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" => ACTIVITYPUB_G5_USERNAME)) {
+function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" => ACTIVITYPUB_G5_USERNAME), $status = "draft") {
     global $g5;
 
     // 반환할 글 번호
@@ -454,6 +454,11 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
     }
     $wr_7 = implode(',', $receivers);
 
+    // 상태 저장
+    //  * 발행을 완료하기 전이라면: draft
+    //  * 발행을 완료한 후라면: published
+    $wr_8 = $status;
+
     // 게시글로 등록
     $sql = "
         insert into $write_table
@@ -487,7 +492,7 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
                 wr_5 = '',
                 wr_6 = '$wr_6',
                 wr_7 = '$wr_7',
-                wr_8 = '',
+                wr_8 = '$wr_8',
                 wr_9 = '',
                 wr_10 = ''
     ";
@@ -641,9 +646,10 @@ class _GNUBOARD_ActivityPub {
                 break;
 
             case "http":
+            case "https":
                 return activitypub_json_encode(array("message" => "Not implemented"));
                 break;
-                
+
             default:
                 return activitypub_json_encode(array("message" => "Not supported resource type"));
                 break;
@@ -721,10 +727,9 @@ class _GNUBOARD_ActivityPub {
                             if (empty($object['content']))
                                 $object['content'] = "[NO CONTENT]";
 
-
                             // 수신된 내용 등록
-                            $activity_wr_id = activitypub_add_activity("inbox", $data, $mb);
-                            
+                            $activity_wr_id = activitypub_add_activity("inbox", $data, $mb, "published");
+
                             // 컨텐츠 설정
                             $bo = get_board_db(ACTIVITYPUB_G5_BOARDNAME, true);
                             $content = sprintf("%s\r\n\r\n[외부에서 전송된 글입니다. 자세한 내용은 %s#%s 글을 확인하세요.]", $object['content'], $bo['bo_subject'], $activity_wr_id);
@@ -975,7 +980,7 @@ function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redi
             activitypub_get_url("user", array("mb_id" => $member['mb_id'])),
             $member
         );
-        activitypub_add_activity("outbox", $data, $member);
+        activitypub_add_activity("outbox", $data, $member, "published");
     } else {
         // 글 전송하기
         $mb = get_member(ACTIVITYPUB_G5_USERNAME);
@@ -984,7 +989,7 @@ function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redi
             activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
             $mb
         );
-        activitypub_add_activity("outbox", $data, $mb);
+        activitypub_add_activity("outbox", $data, $mb, "published");
     }
 }
 
@@ -1004,7 +1009,7 @@ function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_ur
             G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
             $member
         );
-        activitypub_add_activity("outbox", $data, $member);
+        activitypub_add_activity("outbox", $data, $member, "published");
     } else {
         // 글 전송하기
         $mb = get_member(ACTIVITYPUB_G5_USERNAME);
@@ -1013,7 +1018,7 @@ function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_ur
             G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
             $mb
         );
-        activitypub_add_activity("outbox", $data, $mb);
+        activitypub_add_activity("outbox", $data, $mb, "published");
     }
 }
 
