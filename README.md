@@ -23,8 +23,8 @@ ActivityPub implementation for GNUBOARD 5
 - [x] Followers
 - [x] Following
 - [x] Liked
-- [x] Geolocation
-- [ ] File attachment
+- [x] (Added) Geolocation
+- [ ] (Added) File attachment
 
 ## 전문 예시
 
