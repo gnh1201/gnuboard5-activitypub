@@ -455,8 +455,8 @@ function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" =
     $wr_7 = implode(',', $receivers);
 
     // 상태 저장
-    //  * 발행을 완료하기 전이라면: draft
-    //  * 발행을 완료한 후라면: published
+    //  * 주어진 임무를 진행하기 전이라면: draft
+    //  * 일을 저지른 뒤라면: published
     $wr_8 = $status;
 
     // 게시글로 등록
