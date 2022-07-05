@@ -1,12 +1,15 @@
 # gnuboard5-activitypub
 ActivityPub implementation for GNUBOARD 5
 
-## W3C Documentation
-  * https://www.w3.org/TR/activitypub/
-  * https://github.com/w3c/activitypub/issues/194
-  * https://docs.joinmastodon.org/spec/webfinger/
-  * https://organicdesign.nz/ActivityPub_Code
-  * https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
+## References
+* https://www.w3.org/TR/activitypub/
+* https://www.w3.org/TR/activitystreams-core/
+* https://www.w3.org/TR/activitystreams-vocabulary/
+* https://github.com/w3c/activitypub/issues/194
+* https://docs.joinmastodon.org/spec/webfinger/
+* https://organicdesign.nz/ActivityPub_Code
+* https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
+* https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
 
 ## 사용 전 설정
   * `apstreams` 게시판 추가
