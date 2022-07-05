@@ -25,18 +25,18 @@ ActivityPub implementation for GNUBOARD 5
 
 ```json
 {
-    "@context": "https:\/\/www.w3.org\/ns\/activitystreams",
+    "@context": "https://www.w3.org/ns/activitystreams",
     "type": "Create",
-    "id": "",
-    "to": ["https:\/\/www.w3.org\/ns\/activitystreams#Public", "http:\/\/your-own-website.local\/?route=activitypub.user&mb_id=admin"],
-    "actor": "http:\/\/your-own-website.local\/?route=activitypub.user&mb_id=admin",
+    "id": "http://website.local/bbs/board.php?bo_table=apstreams#Draft",
+    "to": ["https://www.w3.org/ns/activitystreams#Public", "http://website.local/?route=activitypub.user&mb_id=admin"],
+    "actor": "http://website.local/?route=activitypub.user&mb_id=admin",
     "object": {
         "type": "Note",
-        "generator": "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: 4d6076784cbd864ade7c746690d37051)",
-        "id": "http:\/\/your-own-website.local\/bbs\/bbs\/board.php?bo_table=apstreams&wr_id=150",
-        "attributedTo": "http:\/\/your-own-website.local\/?route=activitypub.user&mb_id=admin",
-        "content": "hello world @admin@your-own-website.local",
-        "icon": "https:\/\/www.gravatar.com\/avatar\/bdbd5eb70305f1eaaa0340687758676a",
+        "generator": "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: 4d6076784cbd864ade7c746690d37051, INSTANCE_VERSION: 0.1.10-dev)",
+        "id": "http://website.local/bbs/board.php?bo_table=apstreams&wr_id=156",
+        "attributedTo": "http://website.local/?route=activitypub.user&mb_id=admin",
+        "content": "hello world @admin@website.local",
+        "icon": "https://www.gravatar.com/avatar/bdbd5eb70305f1eaaa0340687758676a",
         "location": {
             "name": "xxx.xxx.xxx.xxx, Seoul, Seoul-teukbyeolsi, Korea (Republic of), KR, 06030, +09:00",
             "type": "Place",
@@ -45,8 +45,8 @@ ActivityPub implementation for GNUBOARD 5
             "units": "m"
         }
     },
-    "published": "2022-07-05T09:22:19Z",
-    "updated": "2022-07-05T09:22:19Z"
+    "published": "2022-07-05T09:37:06Z",
+    "updated": "2022-07-05T09:37:06Z"
 }
 ```
 
