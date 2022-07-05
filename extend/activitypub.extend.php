@@ -17,6 +17,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
+define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.10-dev");
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
 define("ACTIVITYPUB_URL", (empty(G5_URL) ? "http://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
@@ -27,7 +28,45 @@ define("ACTIVITYPUB_G5_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;");
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
-define("ACTIVITYPUB_ENABLE_GEOLOCATION", true);
+define("ACTIVITYPUB_ENABLE_GEOLOCATION", false);   // 위치정보 사용 시 활성화 (데이터 다운로드: https://lite.ip2location.com/)
+
+$activitypub_loaded_libraries = array();
+
+function activitypub_load_library($name, $callback) {
+    global $activitypub_loaded_libraries;
+    
+    $_ = array(
+        "ip2location" => array(
+            G5_LIB_PATH . "/IP2Location-PHP-Module/src/Country.php",
+            G5_LIB_PATH . "/IP2Location-PHP-Module/src/Database.php",
+            G5_LIB_PATH . "/IP2Location-PHP-Module/src/IpTools.php"
+        )
+    );
+    foreach($_[$name] as $f) {
+        if (file_exists($f)) include($f);
+    }
+
+    array_push($activitypub_loaded_libraries, array(
+        "name" => $name,
+        "files" => $_[$name],
+        "data" => call_user_func($callback)
+    ));
+}
+
+function activitypub_get_library_data($name) {
+    global $activitypub_loaded_libraries;
+
+    $data = null;
+
+    foreach($activitypub_loaded_libraries as $library) {
+        if($library['name'] == $name) {
+            $data = $library['data'];
+            break;
+        }
+    }
+    
+    return $data;
+}
 
 function activitypub_json_encode($arr) {
     return json_encode($arr);
@@ -269,6 +308,42 @@ function activitypub_http_post($url, $rawdata, $access_token = '') {
 }
 
 function activitypub_publish_content($content, $id, $mb, $_added_object = array(), $_added_to = array()) {
+    // 위치정보를 사용하는 경우 모듈 로드
+    $location_ctx = array();
+    if (ACTIVITYPUB_ENABLE_GEOLOCATION) {
+        // 위치 정보 확인
+        $ip2location_library_data = activitypub_get_library_data("ip2location");
+
+        // 조회해둔 위치 정보가 없다면 새로 조회
+        if (!isset($ip2location_library_data['records'])) {
+            activitypub_load_library("ip2location", function() {
+                $db = new \IP2Location\Database(G5_DATA_PATH . '/IP2LOCATION-LITE-DB11.BIN', \IP2Location\Database::FILE_IO);
+                $records = $db->lookup($_SERVER['REMOTE_ADDR'], \IP2Location\Database::ALL);
+                return array("db" => $db, "records" => $records);
+            });
+            $ip2location_library_data = activitypub_get_library_data("ip2location");
+        }
+
+        // 위치 정보 작성
+        $records = $ip2location_library_data['records'];
+        $location_ctx = array(
+            "name" => implode(", ", array(
+                $records['ipAddress'],
+                $records['cityName'],
+                $records['regionName'],
+                $records['countryName'],
+                $records['countryCode'],
+                $records['zipCode'],
+                $records['timeZone']
+            )),
+            "type" => "Place",
+            "longitude" => $records['longitude'],
+            "latitude" => $records['latitude'],
+            //"altitude" => 90,
+            "units" => "m"
+        );
+    }
+
     // 컨텐츠 파싱
     $terms = activitypub_parse_content($content);
 
@@ -313,7 +388,7 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
     // 전문 생성 시작
     $object = array(
         "type" => "Note",
-        "generator" => "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: " . ACTIVITYPUB_INSTANCE_ID . ")",
+        "generator" => "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: " . ACTIVITYPUB_INSTANCE_ID . ", INSTANCE_VERSION: " . ACTIVITYPUB_INSTANCE_VERSION . ")",
         "id" => $id,
         "attributedTo" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
         "content" => $content,
@@ -322,18 +397,9 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
 
     // 위치정보가 활성화되어 있으면
     if (ACTIVITYPUB_ENABLE_GEOLOCATION) {
-        /*
         $object = array_merge($object, array(
-            "location" => array(
-                "name" => "",
-                "type" => "Place",
-                "longitude" => 12.34,
-                "latitude" => 56.78,
-                "altitude" => 90,
-                "units" => "m"
-            )
+            "location" => $location_ctx
         ));
-        */
     }
 
     // 전문 생성 완료
@@ -343,7 +409,7 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
     $data = array(
         "@context" => NAMESPACE_ACTIVITYSTREAMS,
         "type" => "Create",
-        "id" => "",
+        "id" => G5_BBS_URL . "/board.php?bo_table=" . ACTIVITYPUB_G5_BOARDNAME . "#Draft",
         "to" => $to,
         "actor" => $object['attributedTo'],
         "object" => $object
@@ -1046,7 +1112,7 @@ function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_ur
         // 글 전송하기
         $data = activitypub_publish_content(
             $row['wr_content'],
-            G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
+            G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
             $member
         );
         activitypub_add_activity("outbox", $data, $member, "published");
@@ -1055,7 +1121,7 @@ function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_ur
         $mb = get_member(ACTIVITYPUB_G5_USERNAME);
         $data = activitypub_publish_content(
             $row['wr_content'],
-            G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
+            G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
             $mb
         );
         activitypub_add_activity("outbox", $data, $mb, "published");
@@ -1075,9 +1141,9 @@ function _activitypub_comment_update_after($board, $wr_id, $w, $qstr, $redirect_
         // 글 전송하기
         $data = activitypub_publish_content(
             $row['wr_content'],
-            G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_parent']}&c_id=" . $comment_id,
+            G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_parent']}&c_id=" . $comment_id,
             $member,
-            array("inReplyTo" => G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}")
+            array("inReplyTo" => G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}")
         );
         activitypub_add_activity("outbox", $data, $member);
     } else {
@@ -1085,9 +1151,9 @@ function _activitypub_comment_update_after($board, $wr_id, $w, $qstr, $redirect_
         $mb = get_member(ACTIVITYPUB_G5_USERNAME);
         $data = activitypub_publish_content(
             $row['wr_content'],
-            G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_parent']}&c_id=" . $comment_id,
+            G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_parent']}&c_id=" . $comment_id,
             $mb,
-            array("inReplyTo" => G5_BBS_URL . "/bbs/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}")
+            array("inReplyTo" => G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}")
         );
         activitypub_add_activity("outbox", $data, $mb);
     }
