@@ -18,7 +18,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://github.com/autogestion/pubgate-telegram
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
-define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.10-dev");
+define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.11-dev");
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
 define("ACTIVITYPUB_URL", (empty(G5_URL) ? "http://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
