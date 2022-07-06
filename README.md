@@ -27,8 +27,8 @@ ActivityPub implementation for GNUBOARD 5
 - [ ] (Added) File attachment
 
 ## 부가기능 (옵션)
-- [x] 날씨
-- [x] 환율
+- [x] 날씨 (openweathermap.org)
+- [x] 환율 (koreaexim.go.kr)
 
 ## 전문 예시
 
