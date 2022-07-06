@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-04 (version 0.1.10-dev)
+// 2022-07-06 (version 0.1.10)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -15,6 +15,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://organicdesign.nz/ActivityPub_Code
 //   * https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
 //   * https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
+//   * https://github.com/autogestion/pubgate-telegram
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.10-dev");
@@ -31,6 +32,7 @@ define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystream
 define("ACTIVITYPUB_ENABLED_GEOLOCATION", false);   // 위치정보 활성화 (https://lite.ip2location.com/)
 define("NAVERCLOUD_ENABLED_GEOLOCATION", false);   // 국내용 위치정보 활성화 (https://www.ncloud.com/product/applicationService/geoLocation)
 define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설정
+define("NAVERCLOUD_API_SECRET_KEY", "");   // 네이버 클라우드 API 키 설정
 
 $activitypub_loaded_libraries = array();
 
@@ -215,24 +217,12 @@ function activitypub_set_liked($good, $bo_table, $wr_id) {
     sql_query(" insert {$g5['board_good_table']} set bo_table = '{$bo_table}', wr_id = '{$wr_id}', mb_id = '" . ACTIVITYPUB_G5_USERNAME . "', bg_flag = '{$good}', bg_datetime = '" . G5_TIME_YMDHIS . "' ");
 }
 
-function activitypub_http_noheader_get($url, $access_token = '') {
-    $headers = array();
-    if (!empty($access_token)) {
-        $headers["Authorization"] = "Bearer " . $access_token;
+function activitypub_build_http_headers($headers) {
+    $lines = array();
+    foreach($headers as $k=>$v) {
+        array_push($lines, $k . ": " . $v);
     }
-
-    $ch = curl_init();
-    curl_setopt_array($ch, array(
-        CURLOPT_URL => $url,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_RETURNTRANSFER => true
-    ));
-    $response = curl_exec($ch);
-    curl_close($ch);
-
-    return activitypub_json_decode($response, true);
+    return $lines;
 }
 
 function activitypub_http_get($url, $access_token = '') {
@@ -244,38 +234,10 @@ function activitypub_http_get($url, $access_token = '') {
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
-        CURLOPT_HTTPHEADER => array(
-            "Accept" => $headers
-        ),
+        CURLOPT_HTTPHEADER => activitypub_build_http_headers($headers),
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true
-    ));
-    $response = curl_exec($ch);
-    curl_close($ch);
-
-    // 일부 서버는 ActivityPub을 위한 Accept 헤더를 해석하지 못함
-    if (strpos($response, "<title>400 Bad Request</title>") !== false)
-        return activitypub_http_noheader_get($url, $access_token);
-
-    return activitypub_json_decode($response, true);
-}
-
-function activitypub_http_noheader_post($url, $rawdata, $access_token = '') {
-    $headers = array();
-    if (!empty($access_token)) {
-        $headers["Authorization"] = "Bearer " . $access_token;
-    }
-
-    $ch = curl_init();
-    curl_setopt_array($ch, array(
-        CURLOPT_URL => $url,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POSTFIELDS => $rawdata,
-        CURLOPT_POST => true
     ));
     $response = curl_exec($ch);
     curl_close($ch);
@@ -292,7 +254,7 @@ function activitypub_http_post($url, $rawdata, $access_token = '') {
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
-        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_HTTPHEADER => activitypub_build_http_headers($headers),
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true,
@@ -301,12 +263,41 @@ function activitypub_http_post($url, $rawdata, $access_token = '') {
     ));
     $response = curl_exec($ch);
     curl_close($ch);
-    
-    // 일부 서버는 ActivityPub을 위한 Accept 헤더를 해석하지 못함
-    if (strpos($response, "<title>400 Bad Request</title>") !== false)
-        return activitypub_http_noheader_post($url, $rawdata, $access_token);
-    
+
     return activitypub_json_decode($response, true);
+}
+
+function navercloud_get_geolocation($ip) {
+    $params = array(
+        "ip" => $ip,
+        "enc" => "utf8",
+        "ext" => "t",
+        "responseFormatType" => "json"
+    );
+    $timestamp = floor(microtime(true) * 1000);
+    $uri = "/geolocation/v2/geoLocation?" . http_build_query($params);
+    $endpoint_url = "https://geolocation.apigw.ntruss.com" . $uri;
+    $message = "GET " . $uri . "\n" . $timestamp . "\n" . NAVERCLOUD_API_ACCESS_KEY;
+    $sig = base64_encode(hash_hmac("sha256", $message, NAVERCLOUD_API_SECRET_KEY, true));
+
+    $headers = activitypub_build_http_headers(array(
+        "x-ncp-apigw-timestamp" => $timestamp,
+        "x-ncp-iam-access-key" => NAVERCLOUD_API_ACCESS_KEY,
+        "x-ncp-apigw-signature-v2" => $sig
+    ));
+
+    $ch = curl_init();
+    curl_setopt_array($ch, array(
+        CURLOPT_URL => $endpoint_url,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_RETURNTRANSFER => true
+    ));
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    return activitypub_json_decode($response);
 }
 
 function activitypub_publish_content($content, $id, $mb, $_added_object = array(), $_added_to = array()) {
@@ -332,7 +323,23 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
         // 국내 위치 확인
         if (NAVERCLOUD_ENABLED_GEOLOCATION) {
             if ($records['countryCode'] == "KR") {
-                // TODO
+                // 국내 위치정보 요청
+                $response = navercloud_get_geolocation($records['ipAddress']);
+
+                // 정상적으로 반환된 경우
+                if ($response['returnCode'] === 0) {
+                    $records['cityName'] = implode(", ", array(
+                        implode(" ", array(
+                            $response['geoLocation']['r1'],
+                            $response['geoLocation']['r2'],
+                            $response['geoLocation']['r3'],
+                            "(" . $response['geoLocation']['net'] . ")"
+                        )),
+                        $records['cityName']
+                    ));
+                    $records['longitude'] = $response['geoLocation']['long'];
+                    $records['latitude'] = $response['geoLocation']['lat'];
+                }
             }
         }
 
