@@ -35,6 +35,8 @@ define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설
 define("NAVERCLOUD_API_SECRET_KEY", "");   // 네이버 클라우드 API 키 설정
 define("OPENWEATHERMAP_ENABLED", false);   // 날씨정보 활성화
 define("OPENWEATHERMAP_API_KEY", "");   // 날씨정보 키 설정 (https://openweathermap.org/api/one-call-3)
+define("KOREAEXIM_ENABLED", false);   // 한국수출입은행 현재환율 API
+define("KOREAEXIM_API_KEY", "");   // 한국수출입은행 현재환율 API 키
 
 $activitypub_loaded_libraries = array();
 
@@ -324,6 +326,40 @@ function openweathermap_get_data($args = array("longitude" => "", "latitude" => 
     return activitypub_json_decode($response);
 }
 
+function koreaexim_get_exchange_data() {
+    $data = array();
+
+    $params = array(
+        "authkey" => KOREAEXIM_API_KEY,
+        //"searchdate" => "20180102",
+        "data" => "AP01"
+    );
+    
+    $url = "https://www.koreaexim.go.kr/site/program/financial/exchangeJSON?" . http_build_query($params);
+    $ch = curl_init();
+    curl_setopt_array($ch, array(
+        CURLOPT_URL => $url,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_RETURNTRANSFER => true
+    ));
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $items = activitypub_json_decode($response);
+    foreach($items as $item) {
+        if ($item['result'] === 1) {
+            $k = "KRW-" . $item['cur_unit'];
+            $data[$k] = array(
+                "ttb" => $item['ttb'],
+                "tts" => $item['tts']
+            );
+        }
+    }
+
+    return $data;
+}
+
 function activitypub_publish_content($content, $id, $mb, $_added_object = array(), $_added_to = array()) {
     // 위치정보를 사용하는 경우 모듈 로드
     $location_ctx = array();
@@ -393,7 +429,16 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
 
             if (isset($response['current'])) {
                 $location_ctx = array_merge($location_ctx, array(
-                    "_openweathermap_current" => $response['current']
+                    "_weather" => $response['current']
+                ));
+            }
+        }
+
+        // 환율 정보가 활성화되어 있으면
+        if (KOREAEXIM_ENABLED) {
+            if ($records['countryCode'] == "KR") {
+                $location_ctx = array_merge($location_ctx, array(
+                    "_exchange" => koreaexim_get_exchange_data()
                 ));
             }
         }
