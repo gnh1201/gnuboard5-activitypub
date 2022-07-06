@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-06 (version 0.1.10)
+// 2022-07-06 (version 0.1.11-dev)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -33,6 +33,8 @@ define("ACTIVITYPUB_ENABLED_GEOLOCATION", false);   // 위치정보 활성화 (h
 define("NAVERCLOUD_ENABLED_GEOLOCATION", false);   // 국내용 위치정보 활성화 (https://www.ncloud.com/product/applicationService/geoLocation)
 define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설정
 define("NAVERCLOUD_API_SECRET_KEY", "");   // 네이버 클라우드 API 키 설정
+define("OPENWEATHERMAP_ENABLED", false);   // 날씨정보 활성화
+define("OPENWEATHERMAP_API_KEY", "");   // 날씨정보 키 설정 (https://openweathermap.org/api/one-call-3)
 
 $activitypub_loaded_libraries = array();
 
@@ -300,6 +302,28 @@ function navercloud_get_geolocation($ip) {
     return activitypub_json_decode($response);
 }
 
+function openweathermap_get_data($args = array("longitude" => "", "latitude" => "")) {
+    $params = array(
+        "lat" => $args['latitude'],
+        "lon" => $args['longitude'],
+        "exclude" => "",
+        "appid" => OPENWEATHERMAP_API_KEY
+    );
+    
+    $url = "https://api.openweathermap.org/data/3.0/onecall?" . http_build_query($params);
+    $ch = curl_init();
+    curl_setopt_array($ch, array(
+        CURLOPT_URL => $url,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_RETURNTRANSFER => true
+    ));
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    return activitypub_json_decode($response);
+}
+
 function activitypub_publish_content($content, $id, $mb, $_added_object = array(), $_added_to = array()) {
     // 위치정보를 사용하는 경우 모듈 로드
     $location_ctx = array();
@@ -357,9 +381,22 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
             "type" => "Place",
             "longitude" => $records['longitude'],
             "latitude" => $records['latitude'],
-            //"altitude" => 90,
-            "units" => "m"
+            "units" => "m",
         );
+
+        // 날씨 정보가 활성화되어 있으면
+        if (OPENWEATHERMAP_ENABLED) {
+            $response = openweathermap_get_data(array(
+                "longitude" => $records['longitude'],
+                "latitude" => $records['latitude']
+            ));
+
+            if (isset($response['current'])) {
+                $location_ctx = array_merge($location_ctx, array(
+                    "_openweathermap_current" => $response['current']
+                ));
+            }
+        }
     }
 
     // 컨텐츠 파싱
