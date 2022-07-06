@@ -28,7 +28,9 @@ define("ACTIVITYPUB_G5_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;");
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
-define("ACTIVITYPUB_ENABLE_GEOLOCATION", false);   // 위치정보 사용 시 활성화 (데이터 다운로드: https://lite.ip2location.com/)
+define("ACTIVITYPUB_ENABLED_GEOLOCATION", false);   // 위치정보 활성화 (https://lite.ip2location.com/)
+define("NAVERCLOUD_ENABLED_GEOLOCATION", false);   // 국내용 위치정보 활성화 (https://www.ncloud.com/product/applicationService/geoLocation)
+define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설정
 
 $activitypub_loaded_libraries = array();
 
@@ -310,7 +312,7 @@ function activitypub_http_post($url, $rawdata, $access_token = '') {
 function activitypub_publish_content($content, $id, $mb, $_added_object = array(), $_added_to = array()) {
     // 위치정보를 사용하는 경우 모듈 로드
     $location_ctx = array();
-    if (ACTIVITYPUB_ENABLE_GEOLOCATION) {
+    if (ACTIVITYPUB_ENABLED_GEOLOCATION) {
         // 위치 정보 확인
         $ip2location_library_data = activitypub_get_library_data("ip2location");
 
@@ -324,8 +326,17 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
             $ip2location_library_data = activitypub_get_library_data("ip2location");
         }
 
-        // 위치 정보 작성
+        // 위치정보 불러오기
         $records = $ip2location_library_data['records'];
+
+        // 국내 위치 확인
+        if (NAVERCLOUD_ENABLED_GEOLOCATION) {
+            if ($records['countryCode'] == "KR") {
+                // TODO
+            }
+        }
+
+        // 위치정보 전문 작성
         $location_ctx = array(
             "name" => implode(", ", array(
                 $records['ipAddress'],
@@ -396,7 +407,7 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
     );
 
     // 위치정보가 활성화되어 있으면
-    if (ACTIVITYPUB_ENABLE_GEOLOCATION) {
+    if (ACTIVITYPUB_ENABLED_GEOLOCATION) {
         $object = array_merge($object, array(
             "location" => $location_ctx
         ));
@@ -667,14 +678,15 @@ function activitypub_get_objects($inbox = "inbox", $mb_id = '') {
             }
         }
     }
-    
+
     // 전문 만들기
     $context = array(
         "@context" => NAMESPACE_ACTIVITYSTREAMS,
         "summary" => "Latest items",
         "type" => "Collection",
         "totalItems" => count($items),
-        "items" => $items
+        "items" => $items,
+        "updated" => str_replace('+00:00', 'Z', gmdate('c'))
     );
 
     return $context;
