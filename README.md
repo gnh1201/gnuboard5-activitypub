@@ -42,9 +42,9 @@ ActivityPub implementation for GNUBOARD 5
     "object": {
         "type": "Note",
         "generator": "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: 4d6076784cbd864ade7c746690d37051, INSTANCE_VERSION: 0.1.11-dev)",
-        "id": "http://example.org/bbs/board.php?bo_table=apstreams&wr_id=218",
+        "id": "http://example.org/bbs/board.php?bo_table=apstreams&wr_id=221",
         "attributedTo": "http://example.org/?route=activitypub.user&mb_id=admin",
-        "content": "날씨 어때요? @admin@example.org",
+        "content": "hello, world @admin@example.org",
         "icon": "https://www.gravatar.com/avatar/bdbd5eb70305f1eaaa0340687758676a",
         "location": {
             "name": "xxx.xxx.xxx.xxx, 서울특별시 구로구 구로5동 (DLIVE), Seoul, Seoul-teukbyeolsi, Korea (Republic of), KR, 06030, +09:00",
@@ -53,19 +53,19 @@ ActivityPub implementation for GNUBOARD 5
             "latitude": 37.5001593,
             "units": "m",
             "_weather": {
-                "dt": 1657099094,
+                "dt": 1657103776,
                 "sunrise": 1657052227,
                 "sunset": 1657105004,
-                "temp": 306.04,
-                "feels_like": 310.71,
+                "temp": 305.05,
+                "feels_like": 310.6,
                 "pressure": 1005,
-                "humidity": 55,
-                "dew_point": 295.8,
-                "uvi": 0.8,
+                "humidity": 62,
+                "dew_point": 296.86,
+                "uvi": 0,
                 "clouds": 75,
                 "visibility": 10000,
-                "wind_speed": 2.57,
-                "wind_deg": 160,
+                "wind_speed": 3.09,
+                "wind_deg": 150,
                 "weather": [{
                     "id": 803,
                     "main": "Clouds",
@@ -74,34 +74,36 @@ ActivityPub implementation for GNUBOARD 5
                 }]
             },
             "_exchange": {
-                "KRW-AED": 353.38,
-                "KRW-AUD": 882.25,
-                "KRW-BHD": 3442.79,
-                "KRW-BND": 923.71,
-                "KRW-CAD": 996.28,
-                "KRW-CHF": 1340.42,
-                "KRW-CNH": 194.16,
-                "KRW-DKK": 179.12,
-                "KRW-EUR": 1332.72,
-                "KRW-GBP": 1551.95,
-                "KRW-HKD": 165.42,
-                "KRW-IDR(100)": 8.66,
-                "KRW-JPY(100)": 957.05,
-                "KRW-KRW": 0,
-                "KRW-KWD": 2135.85,
-                "KRW-MYR": 293.7,
-                "KRW-NOK": 129.06,
-                "KRW-NZD": 800.67,
-                "KRW-SAR": 345.76,
-                "KRW-SEK": 123.57,
-                "KRW-SGD": 923.71,
-                "KRW-THB": 36.11,
-                "KRW-USD": 1298
+                "KRW": {
+                    "AED": 353.38,
+                    "AUD": 882.25,
+                    "BHD": 3442.79,
+                    "BND": 923.71,
+                    "CAD": 996.28,
+                    "CHF": 1340.42,
+                    "CNH": 194.16,
+                    "DKK": 179.12,
+                    "EUR": 1332.72,
+                    "GBP": 1551.95,
+                    "HKD": 165.42,
+                    "IDR(100)": 8.66,
+                    "JPY(100)": 957.05,
+                    "KRW": 0,
+                    "KWD": 2135.85,
+                    "MYR": 293.7,
+                    "NOK": 129.06,
+                    "NZD": 800.67,
+                    "SAR": 345.76,
+                    "SEK": 123.57,
+                    "SGD": 923.71,
+                    "THB": 36.11,
+                    "USD": 1298
+                }
             }
         }
     },
-    "published": "2022-07-06T09:18:25Z",
-    "updated": "2022-07-06T09:18:25Z"
+    "published": "2022-07-06T10:36:18Z",
+    "updated": "2022-07-06T10:36:18Z"
 }
 ```
 
