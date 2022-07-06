@@ -329,6 +329,10 @@ function openweathermap_get_data($args = array("longitude" => "", "latitude" => 
 function koreaexim_get_exchange_data() {
     $data = array();
 
+    $_fval = function($s) {
+        return floatval(preg_replace('/\.(?=.*\.)/', '', str_replace(",",".", $s)));
+    };
+
     $params = array(
         "authkey" => KOREAEXIM_API_KEY,
         //"searchdate" => "20180102",
@@ -347,15 +351,13 @@ function koreaexim_get_exchange_data() {
     curl_close($ch);
 
     $items = activitypub_json_decode($response);
+    $KRW = array();
     foreach($items as $item) {
         if ($item['result'] === 1) {
-            $k = "KRW-" . $item['cur_unit'];
-            $data[$k] = array(
-                "ttb" => $item['ttb'],
-                "tts" => $item['tts']
-            );
+            $KRW[$item['cur_unit']] = round(($_fval($item['ttb']) + $_fval($item['tts'])) / 2.0, 2);
         }
     }
+    $data['KRW'] = $KRW;
 
     return $data;
 }
