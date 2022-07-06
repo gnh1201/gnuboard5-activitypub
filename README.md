@@ -32,26 +32,26 @@ ActivityPub implementation for GNUBOARD 5
 {
     "@context": "https://www.w3.org/ns/activitystreams",
     "type": "Create",
-    "id": "http://website.local/bbs/board.php?bo_table=apstreams#Draft",
-    "to": ["https://www.w3.org/ns/activitystreams#Public", "http://website.local/?route=activitypub.user&mb_id=admin"],
-    "actor": "http://website.local/?route=activitypub.user&mb_id=admin",
+    "id": "http://example.org/bbs/board.php?bo_table=apstreams#Draft",
+    "to": ["https://www.w3.org/ns/activitystreams#Public", "http://example.org/?route=activitypub.user&mb_id=admin"],
+    "actor": "http://example.org/?route=activitypub.user&mb_id=admin",
     "object": {
         "type": "Note",
         "generator": "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: 4d6076784cbd864ade7c746690d37051, INSTANCE_VERSION: 0.1.10-dev)",
-        "id": "http://website.local/bbs/board.php?bo_table=apstreams&wr_id=156",
-        "attributedTo": "http://website.local/?route=activitypub.user&mb_id=admin",
-        "content": "hello world @admin@website.local",
+        "id": "http://example.org/bbs/board.php?bo_table=apstreams&wr_id=183",
+        "attributedTo": "http://example.org/?route=activitypub.user&mb_id=admin",
+        "content": "hello world @admin@example.org",
         "icon": "https://www.gravatar.com/avatar/bdbd5eb70305f1eaaa0340687758676a",
         "location": {
-            "name": "xxx.xxx.xxx.xxx, Seoul, Seoul-teukbyeolsi, Korea (Republic of), KR, 06030, +09:00",
+            "name": "xxx.xxx.xxx.xxx, 인천광역시 남동구 구월3동 (SK Broadband Co Ltd), Seoul, Seoul-teukbyeolsi, Korea (Republic of), KR, 06030, +09:00",
             "type": "Place",
-            "longitude": 126.977943,
-            "latitude": 37.566311,
+            "longitude": 126.6969053,
+            "latitude": 37.4527115,
             "units": "m"
         }
     },
-    "published": "2022-07-05T09:37:06Z",
-    "updated": "2022-07-05T09:37:06Z"
+    "published": "2022-07-06T05:06:26Z",
+    "updated": "2022-07-06T05:06:26Z"
 }
 ```
 
