@@ -43,7 +43,7 @@ ActivityPub implementation for GNUBOARD 5
         "content": "날씨 어때요? @admin@utilhome.dothome.co.kr",
         "icon": "https://www.gravatar.com/avatar/bdbd5eb70305f1eaaa0340687758676a",
         "location": {
-            "name": "xxx.xxx.xxx.xxx, 서울특별시 구로구 구로5동 (DLIVE), Seoul, Seoul-teukbyeolsi, Korea (Republic of), KR, 06030, +09:00",
+            "name": "121.88.93.28, 서울특별시 구로구 구로5동 (DLIVE), Seoul, Seoul-teukbyeolsi, Korea (Republic of), KR, 06030, +09:00",
             "type": "Place",
             "longitude": 126.8892945,
             "latitude": 37.5001593,
