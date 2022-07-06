@@ -32,26 +32,48 @@ ActivityPub implementation for GNUBOARD 5
 {
     "@context": "https://www.w3.org/ns/activitystreams",
     "type": "Create",
-    "id": "http://example.org/bbs/board.php?bo_table=apstreams#Draft",
-    "to": ["https://www.w3.org/ns/activitystreams#Public", "http://example.org/?route=activitypub.user&mb_id=admin"],
-    "actor": "http://example.org/?route=activitypub.user&mb_id=admin",
+    "id": "http://utilhome.dothome.co.kr/bbs/board.php?bo_table=apstreams#Draft",
+    "to": ["https://www.w3.org/ns/activitystreams#Public", "http://utilhome.dothome.co.kr/?route=activitypub.user&mb_id=admin"],
+    "actor": "http://utilhome.dothome.co.kr/?route=activitypub.user&mb_id=admin",
     "object": {
         "type": "Note",
         "generator": "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: 4d6076784cbd864ade7c746690d37051, INSTANCE_VERSION: 0.1.10-dev)",
-        "id": "http://example.org/bbs/board.php?bo_table=apstreams&wr_id=183",
-        "attributedTo": "http://example.org/?route=activitypub.user&mb_id=admin",
-        "content": "hello world @admin@example.org",
+        "id": "http://utilhome.dothome.co.kr/bbs/board.php?bo_table=apstreams&wr_id=193",
+        "attributedTo": "http://utilhome.dothome.co.kr/?route=activitypub.user&mb_id=admin",
+        "content": "날씨 어때요? @admin@utilhome.dothome.co.kr",
         "icon": "https://www.gravatar.com/avatar/bdbd5eb70305f1eaaa0340687758676a",
         "location": {
-            "name": "xxx.xxx.xxx.xxx, 인천광역시 남동구 구월3동 (SK Broadband Co Ltd), Seoul, Seoul-teukbyeolsi, Korea (Republic of), KR, 06030, +09:00",
+            "name": "121.88.93.28, 서울특별시 구로구 구로5동 (DLIVE), Seoul, Seoul-teukbyeolsi, Korea (Republic of), KR, 06030, +09:00",
             "type": "Place",
-            "longitude": 126.6969053,
-            "latitude": 37.4527115,
-            "units": "m"
+            "longitude": 126.8892945,
+            "latitude": 37.5001593,
+            "units": "m",
+            "_openweathermap_current": {
+                "dt": 1657094765,
+                "sunrise": 1657052227,
+                "sunset": 1657105004,
+                "temp": 307.05,
+                "feels_like": 311.66,
+                "pressure": 1005,
+                "humidity": 51,
+                "dew_point": 295.49,
+                "uvi": 2.14,
+                "clouds": 100,
+                "visibility": 10000,
+                "wind_speed": 3,
+                "wind_deg": 139,
+                "wind_gust": 4.21,
+                "weather": [{
+                    "id": 804,
+                    "main": "Clouds",
+                    "description": "overcast clouds",
+                    "icon": "04d"
+                }]
+            }
         }
     },
-    "published": "2022-07-06T05:06:26Z",
-    "updated": "2022-07-06T05:06:26Z"
+    "published": "2022-07-06T08:07:01Z",
+    "updated": "2022-07-06T08:07:01Z"
 }
 ```
 
