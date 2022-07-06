@@ -37,8 +37,8 @@ ActivityPub implementation for GNUBOARD 5
     "actor": "http://utilhome.dothome.co.kr/?route=activitypub.user&mb_id=admin",
     "object": {
         "type": "Note",
-        "generator": "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: 4d6076784cbd864ade7c746690d37051, INSTANCE_VERSION: 0.1.10-dev)",
-        "id": "http://utilhome.dothome.co.kr/bbs/board.php?bo_table=apstreams&wr_id=193",
+        "generator": "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: 4d6076784cbd864ade7c746690d37051, INSTANCE_VERSION: 0.1.11-dev)",
+        "id": "http://utilhome.dothome.co.kr/bbs/board.php?bo_table=apstreams&wr_id=196",
         "attributedTo": "http://utilhome.dothome.co.kr/?route=activitypub.user&mb_id=admin",
         "content": "날씨 어때요? @admin@utilhome.dothome.co.kr",
         "icon": "https://www.gravatar.com/avatar/bdbd5eb70305f1eaaa0340687758676a",
@@ -49,7 +49,7 @@ ActivityPub implementation for GNUBOARD 5
             "latitude": 37.5001593,
             "units": "m",
             "_openweathermap_current": {
-                "dt": 1657094765,
+                "dt": 1657095311,
                 "sunrise": 1657052227,
                 "sunset": 1657105004,
                 "temp": 307.05,
@@ -72,8 +72,8 @@ ActivityPub implementation for GNUBOARD 5
             }
         }
     },
-    "published": "2022-07-06T08:07:01Z",
-    "updated": "2022-07-06T08:07:01Z"
+    "published": "2022-07-06T08:15:12Z",
+    "updated": "2022-07-06T08:15:12Z"
 }
 ```
 
