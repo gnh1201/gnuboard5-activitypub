@@ -29,14 +29,14 @@ define("ACTIVITYPUB_G5_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;");
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
-define("ACTIVITYPUB_ENABLED_GEOLOCATION", false);   // 위치정보 활성화 (https://lite.ip2location.com/)
-define("NAVERCLOUD_ENABLED_GEOLOCATION", false);   // 국내용 위치정보 활성화 (https://www.ncloud.com/product/applicationService/geoLocation)
-define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설정
-define("NAVERCLOUD_API_SECRET_KEY", "");   // 네이버 클라우드 API 키 설정
-define("OPENWEATHERMAP_ENABLED", false);   // 날씨정보 활성화
-define("OPENWEATHERMAP_API_KEY", "");   // 날씨정보 키 설정 (https://openweathermap.org/api/one-call-3)
-define("KOREAEXIM_ENABLED", false);   // 한국수출입은행 현재환율 API
-define("KOREAEXIM_API_KEY", "");   // 한국수출입은행 현재환율 API 키
+define("ACTIVITYPUB_ENABLED_GEOLOCATION", true);   // 위치정보 활성화 (https://lite.ip2location.com/)
+define("NAVERCLOUD_ENABLED_GEOLOCATION", true);   // 국내용 위치정보 활성화 (https://www.ncloud.com/product/applicationService/geoLocation)
+define("NAVERCLOUD_API_ACCESS_KEY", "KmUjQNeej5q14ZYrhFG9");   // 네이버 클라우드 API 키 설정
+define("NAVERCLOUD_API_SECRET_KEY", "1GpX5QcWUfa2uy7kJFvkRhU9T4tDAzN7COe4vgqD");   // 네이버 클라우드 API 키 설정
+define("OPENWEATHERMAP_ENABLED", true);   // 날씨정보 활성화
+define("OPENWEATHERMAP_API_KEY", "7506066cfc291e1acfa7119b1ca0bb62");   // 날씨정보 키 설정 (https://openweathermap.org/api/one-call-3)
+define("KOREAEXIM_ENABLED", true);   // 한국수출입은행 현재환율 API
+define("KOREAEXIM_API_KEY", "Gu4EaPsTjet1u7l6kkQGZs5GGrDZYZBD");   // 한국수출입은행 현재환율 API 키
 
 $activitypub_loaded_libraries = array();
 
@@ -460,12 +460,12 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
                 $account_terms = explode('@', $account);
                 $account_ctx = array("username" => $account_terms[0], "host" => $account_terms[1]);
                 if (!empty($account_ctx['host'])) {
-                    // 그누5 전용 WebFinger에 우선적으로 연결
-                    $webfigner_ctx = activitypub_http_get("http://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
+                    // 공통 WebFinger에 연결
+                    $webfigner_ctx = activitypub_http_get("http://" . $account_ctx['host'] . "/.well-known/webfinger?resource=acct:" . $account);
 
-                    // 실패시, 공통 WebFinger에 연결
+                    // 실패시, 그누5 전용 WebFinger에 연결
                     if ($webfigner_ctx['subject'] != ("acct:" . $account)) {
-                        $webfigner_ctx = activitypub_http_get("http://" . $account_ctx['host'] . "/.well-known/webfinger?resource=acct:" . $account);
+                        $webfigner_ctx = activitypub_http_get("http://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
                     }
 
                     // 한번 더 확인
@@ -517,6 +517,10 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
         "object" => $object
     );
 
+    // 초안(Draft) 작성
+    $activity_wr_id = activitypub_update_activity("outbox", $data, $mb, "draft");
+    $data['id'] = G5_BBS_URL . "/board.php?bo_table=" . ACTIVITYPUB_G5_BOARDNAME . "&wr_id=" . $activity_wr_id;
+
     // 보낼 전문을 인코딩
     $rawdata = activitypub_json_encode($data);
 
@@ -553,6 +557,9 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
         // inbox로 데이터 전송
         $response = activitypub_http_post($remote_inbox_url, $rawdata, $access_token);
     }
+
+    // 발행됨(Published)으로 상태 업데이트
+    activitypub_update_activity("outbox", $data, $mb, "published", $activity_wr_id);
 
     return $data;
 }
@@ -603,134 +610,137 @@ function activitypub_parse_content($content) {
     return $entities;
 }
 
-function activitypub_add_activity($inbox = "inbox", $data, $mb = array("mb_id" => ACTIVITYPUB_G5_USERNAME), $status = "draft") {
+function activitypub_update_activity($inbox = "inbox", $data, $mb = array("mb_id" => ACTIVITYPUB_G5_USERNAME), $status = "draft", $wr_id = 0) {
     global $g5;
-
-    // 반환할 글 번호
-    $wr_id = 0;
-
-    // 기본 파라미터
-    $to = $data['to'];
-    $object = $data['object'];
-    $content = $object['content'];
-
-    // 공개 설정이 없는 경우 비밀글로 설정
-    $wr_option = '';
-    if (!in_array(NAMESPACE_ACTIVITYSTREAMS_PUBLIC, $to))
-        $wr_option = 'secret';
-
-    // 게시글로 등록
+    
+    // 게시판 테이블이름
     $write_table = ACTIVITYPUB_G5_TABLENAME;
-    $wr_num = get_next_num($write_table);
-    $wr_reply = '';
-    $ca_name = $inbox;    // Inbox/Outbox
-    $wr_subject = mb_substr($content, 0, 50);
-    $wr_seo_title = $content;
-    $wr_content = $content . "\r\n\r\n[외부에서 전송된 글입니다.]";
-    $wr_link1 = $data['actor'];
-    $wr_link2 = '';
-    $wr_homepage = $data['actor'];
-    $wr_6 = $data['type'];    // Type of Activity
 
-    // 수신자 확인
-    $receivers = array();
-    foreach($to as $_to) {
-        // 수신자 주소(URL) 처리
-        $url_ctx = activitypub_parse_url($_to);
-        $host = $url_ctx['host'];
-        $query = $url_ctx['query'];
+    // Activity 초안(Draft)이 없는 경우
+    if (!($wr_id > 0)) {
+        // 기본 파라미터
+        $to = $data['to'];
+        $object = $data['object'];
+        $content = $object['content'];
 
-        // 특정 회원이 지목되어 있다면 수신자 추가
-        if ($host == ACTIVITYPUB_HOST && !empty($query['mb_id'])) {
-            array_push($receivers, $query['mb_id']);
+        // 공개 설정이 없는 경우 비밀글로 설정
+        $wr_option = '';
+        if (!in_array(NAMESPACE_ACTIVITYSTREAMS_PUBLIC, $to))
+            $wr_option = 'secret';
+
+        // 게시글로 등록
+        $wr_num = get_next_num($write_table);
+        $wr_reply = '';
+        $ca_name = $inbox;    // Inbox/Outbox
+        $wr_subject = mb_substr($content, 0, 50);
+        $wr_seo_title = $content;
+        $wr_content = $content . "\r\n\r\n[외부에서 전송된 글입니다.]";
+        $wr_link1 = $data['actor'];
+        $wr_link2 = '';
+        $wr_homepage = $data['actor'];
+        $wr_6 = $data['type'];    // Type of Activity
+
+        // 수신자 확인
+        $receivers = array();
+        foreach($to as $_to) {
+            // 수신자 주소(URL) 처리
+            $url_ctx = activitypub_parse_url($_to);
+            $host = $url_ctx['host'];
+            $query = $url_ctx['query'];
+
+            // 특정 회원이 지목되어 있다면 수신자 추가
+            if ($host == ACTIVITYPUB_HOST && !empty($query['mb_id'])) {
+                array_push($receivers, $query['mb_id']);
+            }
+        }
+        $wr_7 = implode(',', $receivers);
+
+        // 상태 작업
+        //  * 주어진 임무를 진행하기 전이라면: draft
+        //  * 일을 저지른 뒤라면: published
+        $wr_8 = $status;
+
+        // 게시글로 등록
+        $sql = "
+            insert into $write_table
+                set wr_num = '$wr_num',
+                    wr_reply = '$wr_reply',
+                    wr_comment = 0,
+                    ca_name = '$ca_name',
+                    wr_option = '$wr_option',
+                    wr_subject = '$wr_subject',
+                    wr_content = '$wr_content',
+                    wr_seo_title = '$wr_seo_title',
+                    wr_link1 = '$wr_link1',
+                    wr_link2 = '$wr_link2',
+                    wr_link1_hit = 0,
+                    wr_link2_hit = 0,
+                    wr_hit = 0,
+                    wr_good = 0,
+                    wr_nogood = 0,
+                    mb_id = '{$mb['mb_id']}',
+                    wr_password = '',
+                    wr_name = '{$mb['mb_nick']}',
+                    wr_email = '',
+                    wr_homepage = '$wr_homepage',
+                    wr_datetime = '" . G5_TIME_YMDHIS . "',
+                    wr_last = '" . G5_TIME_YMDHIS . "',
+                    wr_ip = '{$_SERVER['REMOTE_ADDR']}',
+                    wr_1 = '',
+                    wr_2 = '',
+                    wr_3 = '',
+                    wr_4 = '',
+                    wr_5 = '',
+                    wr_6 = '$wr_6',
+                    wr_7 = '$wr_7',
+                    wr_8 = '$wr_8',
+                    wr_9 = '',
+                    wr_10 = ''
+        ";
+        sql_query($sql);
+        $wr_id = sql_insert_id();
+    }
+
+    // Activity를 발행됨(published)으로 상태를 업데이트하는 경우
+    if ($status == "published") {
+        // 저장 전 데이터 처리
+        $now_utc_tz = str_replace('+00:00', 'Z', gmdate('c'));
+        $data['published'] = $now_utc_tz;
+        $data['updated'] = $now_utc_tz;
+
+        // 요청 전문은 파일로 저장
+        $raw_context = activitypub_json_encode($data);
+        $filename = md5($raw_context) . ".json";
+        $filepath = G5_DATA_PATH . "/file/" . ACTIVITYPUB_G5_BOARDNAME . "/" . $filename;
+        $result = file_put_contents($filepath, $raw_context);
+        if ($result !== false) {
+            $bf_source = $filename;
+            $bf_file = $filename;
+            $bf_content = "application/activity+json";
+            $bf_filesize = strlen($raw_context);
+            $sql = " insert into {$g5['board_file_table']}
+                        set bo_table = '" . ACTIVITYPUB_G5_BOARDNAME . "',
+                             wr_id = '{$wr_id}',
+                             bf_no = 0,
+                             bf_source = '{$bf_source}',
+                             bf_file = '{$bf_file}',
+                             bf_content = '{$bf_content}',
+                             bf_fileurl = '',
+                             bf_thumburl = '',
+                             bf_storage = '',
+                             bf_download = 0,
+                             bf_filesize = '{$bf_filesize}',
+                             bf_width = 0,
+                             bf_height = 0,
+                             bf_type = 0,
+                             bf_datetime = '" . G5_TIME_YMDHIS . "' ";
+            sql_query($sql);
+
+            $sql = "update $write_table set wr_file = 1 where wr_id = '{$wr_id}'";
+            sql_query($sql);
         }
     }
-    $wr_7 = implode(',', $receivers);
-
-    // 상태 작업
-    //  * 주어진 임무를 진행하기 전이라면: draft
-    //  * 일을 저지른 뒤라면: published
-    $wr_8 = $status;
-
-    // 게시글로 등록
-    $sql = "
-        insert into $write_table
-            set wr_num = '$wr_num',
-                wr_reply = '$wr_reply',
-                wr_comment = 0,
-                ca_name = '$ca_name',
-                wr_option = '$wr_option',
-                wr_subject = '$wr_subject',
-                wr_content = '$wr_content',
-                wr_seo_title = '$wr_seo_title',
-                wr_link1 = '$wr_link1',
-                wr_link2 = '$wr_link2',
-                wr_link1_hit = 0,
-                wr_link2_hit = 0,
-                wr_hit = 0,
-                wr_good = 0,
-                wr_nogood = 0,
-                mb_id = '{$mb['mb_id']}',
-                wr_password = '',
-                wr_name = '{$mb['mb_nick']}',
-                wr_email = '',
-                wr_homepage = '$wr_homepage',
-                wr_datetime = '" . G5_TIME_YMDHIS . "',
-                wr_last = '" . G5_TIME_YMDHIS . "',
-                wr_ip = '{$_SERVER['REMOTE_ADDR']}',
-                wr_1 = '',
-                wr_2 = '',
-                wr_3 = '',
-                wr_4 = '',
-                wr_5 = '',
-                wr_6 = '$wr_6',
-                wr_7 = '$wr_7',
-                wr_8 = '$wr_8',
-                wr_9 = '',
-                wr_10 = ''
-    ";
-    sql_query($sql);
-    $wr_id = sql_insert_id();
-
-    // 저장 전 데이터 처리
-    $now_utc_tz = str_replace('+00:00', 'Z', gmdate('c'));
-    if ($status == "published") {
-        $data['published'] = $now_utc_tz;
-    }
-    $data['updated'] = $now_utc_tz;
-
-    // 요청 전문은 파일로 저장
-    $raw_context = activitypub_json_encode($data);
-    $time_ms = floor(microtime(true) * 1000);
-    $filename = md5($raw_context . $time_ms) . ".json";
-    $filepath = G5_DATA_PATH . "/file/" . ACTIVITYPUB_G5_BOARDNAME . "/" . $filename;
-    $result = file_put_contents($filepath, $raw_context);
-    if ($result !== false) {
-        $bf_source = $filename;
-        $bf_file = $filename;
-        $bf_content = "application/activity+json";
-        $bf_filesize = strlen($raw_context);
-        $sql = " insert into {$g5['board_file_table']}
-                    set bo_table = '" . ACTIVITYPUB_G5_BOARDNAME . "',
-                         wr_id = '{$wr_id}',
-                         bf_no = 0,
-                         bf_source = '{$bf_source}',
-                         bf_file = '{$bf_file}',
-                         bf_content = '{$bf_content}',
-                         bf_fileurl = '',
-                         bf_thumburl = '',
-                         bf_storage = '',
-                         bf_download = 0,
-                         bf_filesize = '{$bf_filesize}',
-                         bf_width = 0,
-                         bf_height = 0,
-                         bf_type = 0,
-                         bf_datetime = '" . G5_TIME_YMDHIS . "' ";
-        sql_query($sql);
-
-        $sql = "update $write_table set wr_file = 1 where wr_id = '{$wr_id}'";
-        sql_query($sql);
-    }
+    
 
     return $wr_id;
 }
@@ -937,7 +947,7 @@ class _GNUBOARD_ActivityPub {
                                 $object['content'] = "[NO CONTENT]";
 
                             // 수신된 내용 등록
-                            $activity_wr_id = activitypub_add_activity("inbox", $data, $mb, "published");
+                            $activity_wr_id = activitypub_update_activity("inbox", $data, $mb, "published");
 
                             // 컨텐츠 설정
                             $bo = get_board_db(ACTIVITYPUB_G5_BOARDNAME, true);
@@ -1189,7 +1199,6 @@ function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redi
             activitypub_get_url("user", array("mb_id" => $member['mb_id'])),
             $member
         );
-        activitypub_add_activity("outbox", $data, $member, "published");
     } else {
         // 글 전송하기
         $mb = get_member(ACTIVITYPUB_G5_USERNAME);
@@ -1198,7 +1207,6 @@ function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redi
             activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
             $mb
         );
-        activitypub_add_activity("outbox", $data, $mb, "published");
     }
 }
 
@@ -1218,7 +1226,6 @@ function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_ur
             G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
             $member
         );
-        activitypub_add_activity("outbox", $data, $member, "published");
     } else {
         // 글 전송하기
         $mb = get_member(ACTIVITYPUB_G5_USERNAME);
@@ -1227,7 +1234,6 @@ function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_ur
             G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
             $mb
         );
-        activitypub_add_activity("outbox", $data, $mb, "published");
     }
 }
 
@@ -1248,7 +1254,6 @@ function _activitypub_comment_update_after($board, $wr_id, $w, $qstr, $redirect_
             $member,
             array("inReplyTo" => G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}")
         );
-        activitypub_add_activity("outbox", $data, $member);
     } else {
         // 글 전송하기
         $mb = get_member(ACTIVITYPUB_G5_USERNAME);
@@ -1258,7 +1263,6 @@ function _activitypub_comment_update_after($board, $wr_id, $w, $qstr, $redirect_
             $mb,
             array("inReplyTo" => G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}")
         );
-        activitypub_add_activity("outbox", $data, $mb);
     }
 }
 
