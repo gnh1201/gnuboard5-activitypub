@@ -32,6 +32,7 @@ ActivityPub implementation for GNUBOARD 5
 
 ## 향후 지원 예정
 - [ ] w3id.org 표준 지원
+- [ ] 메시지 큐(Redis, RebbitMQ, Kafka 등) 지원
 
 ## 전문 예시
 
