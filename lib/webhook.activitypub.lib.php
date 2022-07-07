@@ -17,8 +17,8 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 if (!defined("ACTIVITYPUB_INSTANCE_ID")) return;
 
 define("NATEON_WEBHOOK_URL", "");
-define("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/994470705125134347/ZQUe-LZYDED6MVFSIJb5A_u0kin2hyI26c_LP5lcFje3DpmeVF1AvLB7ap0wFjNrTmNN");
-define("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/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");
+define("DISCORD_WEBHOOK_URL", "");
+define("SLACK_WEBHOOK_URL", "");
 define("SLACK_WEBHOOK_CHANNEL", "#webhook");
 
 function nateon_send_webhook($content, $mb) {
