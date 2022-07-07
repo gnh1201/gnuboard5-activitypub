@@ -10,6 +10,7 @@ ActivityPub implementation for GNUBOARD 5
 * https://organicdesign.nz/ActivityPub_Code
 * https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
 * https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
+* https://github.com/autogestion/pubgate-telegram
 
 ## 사용 전 설정
   * `apstreams` 게시판 추가
