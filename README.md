@@ -30,6 +30,9 @@ ActivityPub implementation for GNUBOARD 5
 - [x] 날씨 (openweathermap.org)
 - [x] 환율 (koreaexim.go.kr)
 
+## 향후 지원 예정
+- [ ] w3id.org 표준 지원
+
 ## 전문 예시
 
 ```json
