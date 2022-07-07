@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-06 (version 0.1.12)
+// 2022-07-06 (version 0.1.13)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -18,7 +18,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://github.com/autogestion/pubgate-telegram
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
-define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.11-dev");
+define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.13-dev");
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
 define("ACTIVITYPUB_URL", (empty(G5_URL) ? "http://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
@@ -35,7 +35,7 @@ define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설
 define("NAVERCLOUD_API_SECRET_KEY", "");   // 네이버 클라우드 API 키 설정
 define("OPENWEATHERMAP_ENABLED", false);   // 날씨정보 활성화
 define("OPENWEATHERMAP_API_KEY", "");   // 날씨정보 API 키 (https://openweathermap.org/api/one-call-3)
-define("KOREAEXIM_ENABLED", false);   // 환율정보 활성화 
+define("KOREAEXIM_ENABLED", false);   // 환율정보 활성화
 define("KOREAEXIM_API_KEY", "");   // 환율정보 API 키 (https://www.koreaexim.go.kr/ir/HPHKIR020M01?apino=2&viewtype=C)
 
 $activitypub_loaded_libraries = array();
@@ -247,6 +247,24 @@ function activitypub_http_get($url, $access_token = '') {
     curl_close($ch);
 
     return activitypub_json_decode($response, true);
+}
+
+function activitypub_get_attachments($bo_table, $wr_id) {
+    global $g5;
+
+    $attachments = array();
+
+    $sql = "select bf_file, bf_content, bf_type from {$g5['board_file_table']} where bo_table = '$bo_table' and wr_id = '$wr_id'";
+    $result = sql_query($sql);
+    while ($row = sql_fetch_array($result)) {
+        array_push($attachments, array(
+            "type" => ($row['bf_type'] > 0 ? "Image" : "File"),
+            "content" => $row['bf_content'],
+            "url" => G5_DATA_URL . "/file/" . $bo_table . "/" . $row['bf_file']
+        ));
+    }
+
+    return $attachments;
 }
 
 function activitypub_http_post($url, $rawdata, $access_token = '') {
@@ -964,7 +982,7 @@ class _GNUBOARD_ActivityPub {
                                 // 특정 글이 지목되어 있을 때 -> 댓글로 작성
                                 if (!empty($query['bo_table']) && !empty($query['wr_id'])) {
                                     $wr_id = $query['wr_id'];
-                                    $write_table = G5_TABLE_PREFIX . $query['bo_table'];
+                                    $write_table = $g5['write_prefix'] . $query['bo_table'];
                                     $wr = get_write($write_table, $wr_id);
 
                                     // 글이 존재하는 경우
@@ -1194,16 +1212,11 @@ function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redi
     if (!in_array(ACTIVITYPUB_G5_USERNAME, $member_list['id'])) return;
 
     // 현재 로그인되어 있으면, 로그인된 계정의 정보를 따름
-    if (!empty($member['mb_id'])) {
+    $mb = (isset($member['mb_id']) ? $member : get_member(ACTIVITYPUB_G5_USERNAME));
+
+    // 글 전송하기
+    if (!empty($mb['mb_id'])) {
         // 글 전송하기
-        $data = activitypub_publish_content(
-            $me_memo,
-            activitypub_get_url("user", array("mb_id" => $member['mb_id'])),
-            $member
-        );
-    } else {
-        // 글 전송하기
-        $mb = get_member(ACTIVITYPUB_G5_USERNAME);
         $data = activitypub_publish_content(
             $me_memo,
             activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
@@ -1219,22 +1232,26 @@ function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_ur
     $sql = "select wr_id, wr_content from {$g5['write_prefix']}{$board['bo_table']} where wr_id = '{$wr_id}'";
     $row = sql_fetch($sql);
     if (empty($row['wr_id'])) return;
-
+    
     // 현재 로그인되어 있으면, 로그인된 계정의 정보를 따름
-    if (!empty($member['mb_id'])) {
-        // 글 전송하기
+    $mb = (isset($member['mb_id']) ? $member : get_member(ACTIVITYPUB_G5_USERNAME));
+
+    // 추가할 오브젝트 속성
+    $_added_object = array();
+
+    // 파일 첨부여부 확인
+    $attachments = activitypub_get_attachments($board['bo_table'], $wr_id);
+    if (count($attachments)) {
+        $_added_object['attachment'] = $attachments;    // ActivityPub 표준 용어는 'attachment'
+    }
+
+    // 글 전송하기
+    if (!empty($mb['mb_id'])) {
         $data = activitypub_publish_content(
             $row['wr_content'],
             G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
-            $member
-        );
-    } else {
-        // 글 전송하기
-        $mb = get_member(ACTIVITYPUB_G5_USERNAME);
-        $data = activitypub_publish_content(
-            $row['wr_content'],
-            G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
-            $mb
+            $mb,
+            $_added_object
         );
     }
 }
@@ -1243,27 +1260,31 @@ function _activitypub_comment_update_after($board, $wr_id, $w, $qstr, $redirect_
     global $g5, $member;
 
     // 본문(댓글) 가져오기
-    $sql = "select wr_id, wr_parent, wr_content from {$g5['write_prefix']}{$board['bo_table']} where wr_id = '{$comment_id}'";
+    $sql = "select wr_id, wr_content from {$g5['write_prefix']}{$board['bo_table']} where wr_id = '{$wr_id}'";
     $row = sql_fetch($sql);
     if (empty($row['wr_id'])) return;
-
+    
     // 현재 로그인되어 있으면, 로그인된 계정의 정보를 따름
-    if (!empty($member['mb_id'])) {
-        // 글 전송하기
-        $data = activitypub_publish_content(
-            $row['wr_content'],
-            G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_parent']}&c_id=" . $comment_id,
-            $member,
-            array("inReplyTo" => G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}")
-        );
-    } else {
-        // 글 전송하기
-        $mb = get_member(ACTIVITYPUB_G5_USERNAME);
+    $mb = (isset($member['mb_id']) ? $member : get_member(ACTIVITYPUB_G5_USERNAME));
+
+    // 추가할 오브젝트 속성
+    $_added_object = array(
+        "inReplyTo" => G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}"
+    );
+
+    // 파일 첨부여부 확인
+    $attachments = activitypub_get_attachments($board['bo_table'], $wr_id);
+    if (count($attachments)) {
+        $_added_object['attachment'] = $attachments;    // ActivityPub 표준 용어는 'attachment'
+    }
+
+    // 글 전송하기
+    if (!empty($mb['mb_id'])) {
         $data = activitypub_publish_content(
             $row['wr_content'],
             G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_parent']}&c_id=" . $comment_id,
             $mb,
-            array("inReplyTo" => G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}")
+            $_added_object
         );
     }
 }
