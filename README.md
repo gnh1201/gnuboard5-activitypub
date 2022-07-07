@@ -24,8 +24,9 @@ ActivityPub implementation for GNUBOARD 5
 - [x] Followers
 - [x] Following
 - [x] Liked
-- [x] (Added) Geolocation
-- [x] (Added) File attachment
+- [x] Geolocation
+- [x] File attachment
+- [ ] File attachment -> Auto sharing (Download/Upload)
 
 ## 부가기능 (옵션)
 - [x] 날씨 (openweathermap.org)
