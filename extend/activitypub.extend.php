@@ -34,9 +34,9 @@ define("NAVERCLOUD_ENABLED_GEOLOCATION", false);   // 국내용 위치정보 활
 define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설정
 define("NAVERCLOUD_API_SECRET_KEY", "");   // 네이버 클라우드 API 키 설정
 define("OPENWEATHERMAP_ENABLED", false);   // 날씨정보 활성화
-define("OPENWEATHERMAP_API_KEY", "");   // 날씨정보 키 설정 (https://openweathermap.org/api/one-call-3)
-define("KOREAEXIM_ENABLED", false);   // 한국수출입은행 현재환율 API
-define("KOREAEXIM_API_KEY", "");   // 한국수출입은행 현재환율 API 키
+define("OPENWEATHERMAP_API_KEY", "");   // 날씨정보 API 키 설정 (https://openweathermap.org/api/one-call-3)
+define("KOREAEXIM_ENABLED", false);   // 환율정보 활성화 
+define("KOREAEXIM_API_KEY", "");   // 환율정보 API 키 (https://www.koreaexim.go.kr/ir/HPHKIR020M01?apino=2&viewtype=C)
 
 $activitypub_loaded_libraries = array();
 
