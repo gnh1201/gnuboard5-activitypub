@@ -29,14 +29,14 @@ define("ACTIVITYPUB_G5_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;");
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
-define("ACTIVITYPUB_ENABLED_GEOLOCATION", true);   // 위치정보 활성화 (https://lite.ip2location.com/)
-define("NAVERCLOUD_ENABLED_GEOLOCATION", true);   // 국내용 위치정보 활성화 (https://www.ncloud.com/product/applicationService/geoLocation)
-define("NAVERCLOUD_API_ACCESS_KEY", "KmUjQNeej5q14ZYrhFG9");   // 네이버 클라우드 API 키 설정
-define("NAVERCLOUD_API_SECRET_KEY", "1GpX5QcWUfa2uy7kJFvkRhU9T4tDAzN7COe4vgqD");   // 네이버 클라우드 API 키 설정
-define("OPENWEATHERMAP_ENABLED", true);   // 날씨정보 활성화
-define("OPENWEATHERMAP_API_KEY", "7506066cfc291e1acfa7119b1ca0bb62");   // 날씨정보 키 설정 (https://openweathermap.org/api/one-call-3)
-define("KOREAEXIM_ENABLED", true);   // 한국수출입은행 현재환율 API
-define("KOREAEXIM_API_KEY", "Gu4EaPsTjet1u7l6kkQGZs5GGrDZYZBD");   // 한국수출입은행 현재환율 API 키
+define("ACTIVITYPUB_ENABLED_GEOLOCATION", false);   // 위치정보 활성화 (https://lite.ip2location.com/)
+define("NAVERCLOUD_ENABLED_GEOLOCATION", false);   // 국내용 위치정보 활성화 (https://www.ncloud.com/product/applicationService/geoLocation)
+define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설정
+define("NAVERCLOUD_API_SECRET_KEY", "");   // 네이버 클라우드 API 키 설정
+define("OPENWEATHERMAP_ENABLED", false);   // 날씨정보 활성화
+define("OPENWEATHERMAP_API_KEY", "");   // 날씨정보 키 설정 (https://openweathermap.org/api/one-call-3)
+define("KOREAEXIM_ENABLED", false);   // 한국수출입은행 현재환율 API
+define("KOREAEXIM_API_KEY", "");   // 한국수출입은행 현재환율 API 키
 
 $activitypub_loaded_libraries = array();
 
