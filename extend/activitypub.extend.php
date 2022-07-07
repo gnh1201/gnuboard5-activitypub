@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-06 (version 0.1.11-dev)
+// 2022-07-06 (version 0.1.11)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
