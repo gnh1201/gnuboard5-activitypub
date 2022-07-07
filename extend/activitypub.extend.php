@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-06 (version 0.1.11)
+// 2022-07-06 (version 0.1.12)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -362,7 +362,7 @@ function koreaexim_get_exchange_data() {
     return $data;
 }
 
-function activitypub_publish_content($content, $id, $mb, $_added_object = array(), $_added_to = array()) {
+function activitypub_publish_content($content, $object_id, $mb, $_added_object = array(), $_added_to = array()) {
     // 위치정보를 사용하는 경우 모듈 로드
     $location_ctx = array();
     if (ACTIVITYPUB_ENABLED_GEOLOCATION) {
@@ -491,7 +491,7 @@ function activitypub_publish_content($content, $id, $mb, $_added_object = array(
     $object = array(
         "type" => "Note",
         "generator" => "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: " . ACTIVITYPUB_INSTANCE_ID . ", INSTANCE_VERSION: " . ACTIVITYPUB_INSTANCE_VERSION . ")",
-        "id" => $id,
+        "id" => $object_id,
         "attributedTo" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
         "content" => $content,
         "icon" => activitypub_get_icon($mb)
@@ -739,8 +739,11 @@ function activitypub_update_activity($inbox = "inbox", $data, $mb = array("mb_id
             $sql = "update $write_table set wr_file = 1 where wr_id = '{$wr_id}'";
             sql_query($sql);
         }
+
+        // 상태 업데이트
+        $sql = "update $write_table set wr_8 = 'published' where wr_id = '$wr_id'";
+        sql_query($sql);
     }
-    
 
     return $wr_id;
 }
@@ -1184,7 +1187,6 @@ class _GNUBOARD_ActivityPub {
 }
 
 // 훅(Hook) 등록
-
 function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redirect_url, $me_memo) {
     global $member;
 
@@ -1269,6 +1271,13 @@ function _activitypub_comment_update_after($board, $wr_id, $w, $qstr, $redirect_
 add_event("write_update_after", "_activitypub_write_update_after", 0, 5);
 add_event("comment_update_after", "_activitypub_comment_update_after", 0, 7);
 add_event("memo_form_update_after", "_activitypub_memo_form_update_after", 0, 4);
+
+// 확장 라이브러리 가져오기 (*.activitypub.lib.php)
+$tmp = dir(G5_LIB_PATH);
+while ($entry = $tmp->read()) {
+    if (preg_match("/(\.activitypub\.lib\.php)$/i", $entry))
+        include(G5_LIB_PATH . "/" . $entry);
+}
 
 // 모든 준비가 완료되고 작업 시작
 $route = $_GET['route'];
