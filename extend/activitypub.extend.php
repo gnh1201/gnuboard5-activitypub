@@ -1207,55 +1207,72 @@ class _GNUBOARD_ActivityPub {
     
     public static function shares() {
         global $g5;
+        
+        // 게시판인 경우
+        if (array_key_exists("bo_table", $_GET)) {
+            $bo = get_board_db($_GET['bo_table'], true);
 
-        $bo = get_board_db($_GET['bo_table'], true);
+            if (!empty($bo['bo_table'])) {
+                switch($bo['bo_table']) {
+                    case ACTIVITYPUB_G5_BOARDNAME:
+                        return self::inbox();   // 액티비티를 저장하는 테이블인 경우 inbox와 동일하게 취급
 
-        if (!empty($bo['bo_table'])) {
-            switch($bo['bo_table']) {
-                case ACTIVITYPUB_G5_BOARDNAME:
-                    return self::inbox();   // 액티비티를 저장하는 테이블인 경우 inbox와 동일하게 취급
+                    default:
+                        $items = array();  // 항목을 담을 배열
 
-                default:
-                    $items = array();  // 항목을 담을 배열
+                        // 조회할 페이지 수 불러오기
+                        $page = intval($_GET['page']);
+                        if ($page < 1) {
+                            $page = 1;
+                        }
 
-                    // 조회할 페이지 수 불러오기
-                    $page = intval($_GET['page']);
-                    if ($page < 1) {
-                        $page = 1;
-                    }
+                        // 페이지 당 표시할 게시물 수 불러오기
+                        $page_rows = 0;
+                        if (!empty($bo['bo_mobile_page_rows'])) {
+                            $page_rows = intval($bo['bo_mobile_page_rows']);
+                        } else if (!empty($bo['bo_page_rows'])) {
+                            $page_rows = intval($bo['bo_page_rows']);
+                        }
 
-                    // 페이지 당 표시할 게시물 수 불러오기
-                    $page_rows = 0;
-                    if (!empty($bo['bo_mobile_page_rows'])) {
-                        $page_rows = intval($bo['bo_mobile_page_rows']);
-                    } else if (!empty($bo['bo_page_rows'])) {
-                        $page_rows = intval($bo['bo_page_rows']);
-                    }
+                        // 페이지 당 표시할 게시물 수가 1보다 작으면 기본값(15)로 설정
+                        if ($pages_rows < 1) {
+                            $page_rows = 15;
+                        }
+                        
+                        // SQL 작성
+                        $write_table = $g5['write_prefix'] . $bo['bo_table'];
+                        $offset = ($page - 1) * $page_rows;
+                        $sql = "select wr_id, mb_id, wr_content, wr_datetime from {$write_table} where FIND_IN_SET('secret', wr_option) = 0 order by wr_datetime desc limit {$offset}, {$page_rows} ";
 
-                    // 페이지 당 표시할 게시물 수가 1보다 작으면 기본값(15)로 설정
-                    if ($pages_rows < 1) {
-                        $page_rows = 15;
-                    }
-                    
-                    // SQL 작성
-                    $write_table = $g5['write_prefix'] . $bo['bo_table'];
-                    $offset = ($page - 1) * $page_rows;
-                    $sql = "select wr_id, mb_id, wr_content, wr_datetime from {$write_table}
-                        where FIND_IN_SET('secret', wr_option) = 0 order by wr_datetime desc limit {$offset}, {$page_rows}";
-
-                    // SQL 실행
-                    $result = sql_query($sql);
-                    while ($row = sql_fetch_array($result)) {
-                        $object_id = G5_BBS_URL . "/board.php?bo_table={$bo['bo_table']}&wr_id={$row['wr_id']}";
-                        $mb = get_member($row['mb_id']);
-                        $content = $row['wr_content'];
-                        array_push($items, activitypub_build_note($content, $object_id, $mb));
-                    }
-
-                    // 결과 반환
-                    return activitypub_json_encode(activitypub_build_collection($items, "Latest shares"));
+                        // SQL 실행
+                        $result = sql_query($sql);
+                        while ($row = sql_fetch_array($result)) {
+                            $object_id = G5_BBS_URL . "/board.php?bo_table={$bo['bo_table']}&wr_id={$row['wr_id']}";
+                            $mb = get_member($row['mb_id']);
+                            $content = $row['wr_content'];
+                            array_push($items, activitypub_build_note($content, $object_id, $mb));
+                        }
+                }
+            }
+        } else {   // 게시판이 아닌 경우
+            // 최근 활동에서 추출
+            $sql = "select * from " . $g5['board_new_table']; 
+            $result = sql_query($sql);
+            while ($row = sql_fetch_array($result)) {
+                $write_table = $g5['write_prefix'] . $row['bo_table'];
+                $sql2 = "select wr_id, mb_id, wr_content, wr_datetime from {$write_table} where wr_id = '{$row['wr_id']}' and FIND_IN_SET('secret', wr_option) = 0 ";
+                $row2 = sql_fetch($sql2);
+                if ($row2['wr_id']) {
+                    $object_id = G5_BBS_URL . "/board.php?bo_table={$row['bo_table']}&wr_id={$row2['wr_id']}";
+                    $mb = get_member($row2['mb_id']);
+                    $content = $row2['wr_content'];
+                    array_push($items, activitypub_build_note($content, $object_id, $mb));
+                }
             }
         }
+
+        // 결과 반환
+        return activitypub_json_encode(activitypub_build_collection($items, "Latest shares"));
     }
 
     public static function close() {
@@ -1423,3 +1440,4 @@ switch ($route) {
         _GNUBOARD_ActivityPub::close();
         break;
 }
+
