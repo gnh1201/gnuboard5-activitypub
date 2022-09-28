@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-07-06 (version 0.1.13)
+// 2022-07-06 (version 0.1.14)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -1301,7 +1301,7 @@ while ($entry = $tmp->read()) {
 }
 
 // 모든 준비가 완료되고 작업 시작
-$route = $_GET['route'];
+$route = array_key_exists("route", $_GET) ? $_GET['route'] : "";
 
 switch ($route) {
     // 액펍(ActivityPub)과 웹핑거(WebFinger)는 다른 개념이지만, 여기서는 액펍(ActivityPub) 전용으로 사용한다.
