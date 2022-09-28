@@ -24,7 +24,7 @@ ActivityPub implementation for GNUBOARD 5
 - [x] Followers
 - [x] Following
 - [x] Liked
-- [x] Geolocation
+- [x] Geolocation (IP2Location, Naver Cloud)
 - [x] File attachment
 - [ ] File attachment -> Auto sharing (Download/Upload)
 
