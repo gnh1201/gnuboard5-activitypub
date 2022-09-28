@@ -29,6 +29,7 @@ ActivityPub implementation for GNUBOARD 5
 - [ ] File attachment -> Auto sharing (Download/Upload)
 
 ## 부가기능 (옵션)
+- [x] 아바타 (gravatar.com)
 - [x] 날씨 (openweathermap.org)
 - [x] 환율 (koreaexim.go.kr)
 
