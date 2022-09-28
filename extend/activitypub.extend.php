@@ -505,25 +505,15 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
         }
     }
 
-    // 전문 생성 시작
-    $object = array(
-        "type" => "Note",
-        "generator" => "GNUBOARD5 ActivityPub Plugin (INSTANCE_ID: " . ACTIVITYPUB_INSTANCE_ID . ", INSTANCE_VERSION: " . ACTIVITYPUB_INSTANCE_VERSION . ")",
-        "id" => $object_id,
-        "attributedTo" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
-        "content" => $content,
-        "icon" => activitypub_get_icon($mb)
-    );
-
     // 위치정보가 활성화되어 있으면
     if (ACTIVITYPUB_ENABLED_GEOLOCATION) {
-        $object = array_merge($object, array(
+        $object = array_merge($_added_object, array(
             "location" => $location_ctx
         ));
     }
 
-    // 전문 생성 완료
-    $object = array_merge($object, $_added_object);
+    // 전문 생성
+    $object = activitypub_build_note($content, $object_id, $mb, $_added_object);
 
     // 외부로 보낼 전문 생성
     $data = array(
@@ -766,17 +756,6 @@ function activitypub_update_activity($inbox = "inbox", $data, $mb = array("mb_id
     return $wr_id;
 }
 
-function activitypub_build_collection($items, $summary = '') {
-    return array(
-        "@context" => NAMESPACE_ACTIVITYSTREAMS,
-        "summary" => $summary,
-        "type" => "Collection",
-        "totalItems" => count($items),
-        "items" => $items,
-        "updated" => str_replace('+00:00', 'Z', gmdate('c'))
-    );
-}
-
 function activitypub_get_objects($inbox = "inbox", $mb_id = '') {
     global $g5;
 
@@ -814,6 +793,31 @@ function activitypub_get_objects($inbox = "inbox", $mb_id = '') {
 
     // 전문 만들기
     return activitypub_build_collection($items);
+}
+
+// Object type: Note
+function activitypub_build_note($content, $object_id, $mb, $_added_object = array()) {
+    return array_merge(array(
+        "type" => "Note",
+        "generator" => "GNUBOARD5-ActivityPub/" . ACTIVITYPUB_INSTANCE_VERSION . " (" . ACTIVITYPUB_INSTANCE_ID . ")",
+        "id" => $object_id,
+        "attributedTo" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
+        "content" => $content,
+        "icon" => activitypub_get_icon($mb)
+    ), $_added_object);
+}
+
+// Object type: Collection
+function activitypub_build_collection($items, $summary = '') {
+    return array(
+        "@context" => NAMESPACE_ACTIVITYSTREAMS,
+        "generator" => "GNUBOARD5-ActivityPub/" . ACTIVITYPUB_INSTANCE_VERSION . " (" . ACTIVITYPUB_INSTANCE_ID . ")",
+        "summary" => $summary,
+        "type" => "Collection",
+        "totalItems" => count($items),
+        "items" => $items,
+        "updated" => str_replace('+00:00', 'Z', gmdate('c'))
+    );
 }
 
 class _GNUBOARD_ActivityPub {
@@ -1204,12 +1208,51 @@ class _GNUBOARD_ActivityPub {
     public static function shares() {
         $bo = get_board_db($_GET['bo_table'], true);
 
-        switch($bo['bo_table']) {
-            case ACTIVITYPUB_G5_BOARDNAME:
-                return self::inbox();   // 액티비티를 저장하는 테이블인 경우 inbox와 동일하게 취급
+        if (!empty($bo['bo_table']) {
+            switch($bo['bo_table']) {
+                case ACTIVITYPUB_G5_BOARDNAME:
+                    return self::inbox();   // 액티비티를 저장하는 테이블인 경우 inbox와 동일하게 취급
 
-            default:
-                return array();  // TODO
+                default:
+                    $items = array();  // 항목을 담을 배열
+
+                    // 조회할 페이지 수 불러오기
+                    $page = intval($_GET['page']);
+                    if ($page < 1) {
+                        $page = 1;
+                    }
+
+                    // 페이지 당 표시할 게시물 수 불러오기
+                    $page_rows = 0;
+                    if (!empty($bo['bo_mobile_page_rows'])) {
+                        $page_rows = intval($bo['bo_mobile_page_rows']);
+                    } else if (!empty($bo['bo_page_rows'])) {
+                        $page_rows = intval($bo['bo_page_rows']);
+                    }
+
+                    // 페이지 당 표시할 게시물 수가 1보다 작으면 기본값(15)로 설정
+                    if ($pages_rows < 1) {
+                        $page_rows = 15;
+                    }
+                    
+                    // SQL 작성
+                    $write_table = $g5['write_prefix'] . $bo['bo_table'];
+                    $offset = ($page - 1) * $page_rows;
+                    $sql = "select wr_id, mb_id, wr_content, wr_datetime from {$write_table}
+                        where FIND_IN_SET('secret', wr_option) = 0 order by wr_datetime desc limit {$offset}, {$page_rows}";
+
+                    // SQL 실행
+                    $result = sql_query($sql);
+                    while ($row = sql_fetch_array($result)) {
+                        $object_id = G5_BBS_URL . "/board.php?bo_table={$bo['bo_table']}&wr_id={$row['wr_id']}";
+                        $mb = get_member($row['mb_id']);
+                        $content = $row['wr_content'];
+                        array_push($items, activitypub_build_note($content, $object_id, $mb));
+                    }
+
+                    // 결과 반환
+                    return activitypub_build_collection($items, "Latest shares");
+            }
         }
     }
 
