@@ -1206,6 +1206,8 @@ class _GNUBOARD_ActivityPub {
     }
     
     public static function shares() {
+        global $g5;
+
         $bo = get_board_db($_GET['bo_table'], true);
 
         if (!empty($bo['bo_table'])) {
@@ -1251,7 +1253,7 @@ class _GNUBOARD_ActivityPub {
                     }
 
                     // 결과 반환
-                    return activitypub_build_collection($items, "Latest shares");
+                    return activitypub_json_encode(activitypub_build_collection($items, "Latest shares"));
             }
         }
     }
