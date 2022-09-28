@@ -1200,6 +1200,10 @@ class _GNUBOARD_ActivityPub {
     public static function liked() {
         return self::inbox();
     }
+    
+    public static function shares() {
+        // TODO
+    }
 
     public static function close() {
         exit();
