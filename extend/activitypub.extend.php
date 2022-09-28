@@ -946,7 +946,7 @@ class _GNUBOARD_ActivityPub {
                 
                 // 컨텐츠 변수 정의
                 $content = '';
-                
+
                 // 컨텐츠 처리
                 if (!empty($data['type'])) {
                     // 정보 불러오기 
@@ -1202,7 +1202,15 @@ class _GNUBOARD_ActivityPub {
     }
     
     public static function shares() {
-        // TODO
+        $bo = get_board_db($_GET['bo_table'], true);
+
+        switch($bo['bo_table']) {
+            case ACTIVITYPUB_G5_BOARDNAME:
+                return self::inbox();   // 액티비티를 저장하는 테이블인 경우 inbox와 동일하게 취급
+
+            default:
+                return array();  // TODO
+        }
     }
 
     public static function close() {
