@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <gnh1201@gmail.com>
 // MIT License
-// 2022-09-28 (version 0.1.14)
+// 2022-09-28 (version 0.1.14-dev)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -18,7 +18,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://github.com/autogestion/pubgate-telegram
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
-define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.13-dev");
+define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.14-dev");
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
 define("ACTIVITYPUB_URL", (empty(G5_URL) ? "http://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
@@ -766,6 +766,17 @@ function activitypub_update_activity($inbox = "inbox", $data, $mb = array("mb_id
     return $wr_id;
 }
 
+function activitypub_build_collection($items, $summary = '') {
+    return array(
+        "@context" => NAMESPACE_ACTIVITYSTREAMS,
+        "summary" => $summary,
+        "type" => "Collection",
+        "totalItems" => count($items),
+        "items" => $items,
+        "updated" => str_replace('+00:00', 'Z', gmdate('c'))
+    );
+}
+
 function activitypub_get_objects($inbox = "inbox", $mb_id = '') {
     global $g5;
 
@@ -802,16 +813,7 @@ function activitypub_get_objects($inbox = "inbox", $mb_id = '') {
     }
 
     // 전문 만들기
-    $context = array(
-        "@context" => NAMESPACE_ACTIVITYSTREAMS,
-        "summary" => "Latest items",
-        "type" => "Collection",
-        "totalItems" => count($items),
-        "items" => $items,
-        "updated" => str_replace('+00:00', 'Z', gmdate('c'))
-    );
-
-    return $context;
+    return activitypub_build_collection($items);
 }
 
 class _GNUBOARD_ActivityPub {
@@ -1187,12 +1189,12 @@ class _GNUBOARD_ActivityPub {
 
     public static function followers() {
         $mb = get_member($_GET['mb_id']);
-        return activitypub_json_encode(array("followers" => activitypub_get_followers($mb)));
+        return activitypub_json_encode(activitypub_build_collection(activitypub_get_followers($mb), "{$mb['mb_name']}'s followers"));
     }
     
     public static function following() {
         $mb = get_member($_GET['mb_id']);
-        return activitypub_json_encode(array("following" => activitypub_get_following($mb)));
+        return activitypub_json_encode(activitypub_build_collection(activitypub_get_following($mb), "{$mb['mb_name']}'s following"));
     }
 
     public static function liked() {
@@ -1351,10 +1353,16 @@ switch ($route) {
         echo _GNUBOARD_ActivityPub::following();
         _GNUBOARD_ActivityPub::close();
         break;
-        
+
     case "activitypub.liked":
         _GNUBOARD_ActivityPub::open();
         echo _GNUBOARD_ActivityPub::liked();
+        _GNUBOARD_ActivityPub::close();
+        break;
+        
+    case "activitypub.shares":
+        _GNUBOARD_ActivityPub::open();
+        echo _GNUBOARD_ActivityPub::shares();
         _GNUBOARD_ActivityPub::close();
         break;
 }
