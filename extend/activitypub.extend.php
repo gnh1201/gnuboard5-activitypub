@@ -1208,7 +1208,7 @@ class _GNUBOARD_ActivityPub {
     public static function shares() {
         $bo = get_board_db($_GET['bo_table'], true);
 
-        if (!empty($bo['bo_table']) {
+        if (!empty($bo['bo_table'])) {
             switch($bo['bo_table']) {
                 case ACTIVITYPUB_G5_BOARDNAME:
                     return self::inbox();   // 액티비티를 저장하는 테이블인 경우 inbox와 동일하게 취급
