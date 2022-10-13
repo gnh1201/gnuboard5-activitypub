@@ -1274,9 +1274,19 @@ class _GNUBOARD_ActivityPub {
         // 결과 반환
         return activitypub_json_encode(activitypub_build_collection($items, "Latest shares"));
     }
-    
-    public static function authorize() {
-        // TODO
+
+    public static function authorize() {    // TODO
+        $result = array();
+
+        $grant_type = $_GET['grant_type'];
+
+        switch ($grant_type) {
+            case "authorization_code": break;
+            case "password": break;
+            case "client_credentials": break;
+        }
+
+        return activitypub_json_encode($result);
     }
 
     public static function close() {
