@@ -1274,6 +1274,10 @@ class _GNUBOARD_ActivityPub {
         // 결과 반환
         return activitypub_json_encode(activitypub_build_collection($items, "Latest shares"));
     }
+    
+    public static function authorize() {
+        // TODO
+    }
 
     public static function close() {
         exit();
@@ -1439,5 +1443,10 @@ switch ($route) {
         echo _GNUBOARD_ActivityPub::shares();
         _GNUBOARD_ActivityPub::close();
         break;
+        
+    case "oauth.authorize":  // TODO
+        _GNUBOARD_ActivityPub::open();
+        echo _GNUBOARD_ActivityPub::authorize();
+        _GNUBOARD_ActivityPub::close();
+        break;
 }
-
