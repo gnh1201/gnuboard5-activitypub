@@ -118,4 +118,4 @@ ActivityPub implementation for GNUBOARD 5
 ```
 
 ## 문의
-* gnh1201@gmail.com
+* abuse@catswords.net
