@@ -1,17 +1,6 @@
 # gnuboard5-activitypub
 ActivityPub implementation for GNUBOARD 5
 
-## References
-* https://www.w3.org/TR/activitypub/
-* https://www.w3.org/TR/activitystreams-core/
-* https://www.w3.org/TR/activitystreams-vocabulary/
-* https://github.com/w3c/activitypub/issues/194
-* https://docs.joinmastodon.org/spec/webfinger/
-* https://organicdesign.nz/ActivityPub_Code
-* https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
-* https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
-* https://github.com/autogestion/pubgate-telegram
-
 ## 사용 전 설정
   * `apstreams` 게시판 추가
   * `apstreams` 사용자 추가
@@ -116,6 +105,17 @@ ActivityPub implementation for GNUBOARD 5
     "updated": "2022-07-07T03:11:12Z"
 }
 ```
+
+## References
+* https://www.w3.org/TR/activitypub/
+* https://www.w3.org/TR/activitystreams-core/
+* https://www.w3.org/TR/activitystreams-vocabulary/
+* https://github.com/w3c/activitypub/issues/194
+* https://docs.joinmastodon.org/spec/webfinger/
+* https://organicdesign.nz/ActivityPub_Code
+* https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
+* https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
+* https://github.com/autogestion/pubgate-telegram
 
 ## 문의
 * abuse@catswords.net
