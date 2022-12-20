@@ -28,6 +28,7 @@ define("ACTIVITYPUB_G5_USERNAME", "apstreams");
 define("ACTIVITYPUB_G5_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;");
 define("OAUTH2_GRANT_DATAFIELD", "mb_10");    // 회원별 인증 정보를 저장할 필드 (기본: mb_10)
+define("DEFAULT_HTML_ENTITY_FLAGS", ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
 define("ACTIVITYPUB_ENABLED_GEOLOCATION", false);   // 위치정보 활성화 (https://lite.ip2location.com/)
@@ -91,6 +92,8 @@ function activitypub_get_stored_data($s) {
     $terms = array_filter(array_map("trim", explode(";", $s)));
     foreach($terms as $term) {
         list($k, $v) = explode('=', $term);
+        $k = html_entity_decode($k, DEFAULT_HTML_ENTITY_FLAGS, 'UTF-8');
+        $v = html_entity_decode($k, DEFAULT_HTML_ENTITY_FLAGS, 'UTF-8');
         $data[$k] = $v;
     }
 
@@ -100,7 +103,9 @@ function activitypub_get_stored_data($s) {
 function activitypub_build_stored_data($data) {
     $terms = array();
     foreach($data as $k=>$v) {
-        array_push($terms, $k . "=" . $v);
+        $k = htmlentities($k, DEFAULT_HTML_ENTITY_FLAGS, 'UTF-8');
+        $v = htmlentities($v, DEFAULT_HTML_ENTITY_FLAGS, 'UTF-8');
+        array_push($terms, $k . '=' . $v);
     }
     return implode("; ", $terms);
 }
