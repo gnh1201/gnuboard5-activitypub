@@ -27,6 +27,7 @@ define("ACTIVITYPUB_G5_TABLENAME", $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAM
 define("ACTIVITYPUB_G5_USERNAME", "apstreams");
 define("ACTIVITYPUB_G5_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;");
+define("OAUTH2_GRANT_DATAFIELD", "mb_10");    // 회원별 인증 정보를 저장할 필드 (기본: mb_10)
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
 define("ACTIVITYPUB_ENABLED_GEOLOCATION", false);   // 위치정보 활성화 (https://lite.ip2location.com/)
@@ -84,17 +85,25 @@ function activitypub_json_decode($arr) {
     return json_decode($arr, true);
 }
 
-function activitypub_get_access_tokens() {
-    $_access_tokens = array();
+function activitypub_get_stored_data($s) {
+    $data = array();
 
-    $terms = array_filter(array_map("trim", explode(";", ACTIVITYPUB_ACCESS_TOKEN)));
+    $terms = array_filter(array_map("trim", explode(";", $s)));
     foreach($terms as $term) {
         list($k, $v) = explode('=', $term);
-        $_access_tokens[$k] = $v;
+        $data[$k] = $v;
     }
 
-    return $_access_tokens;
-};
+    return $data;
+}
+
+function activitypub_build_stored_data($data) {
+    $terms = array();
+    foreach($data as $k=>$v) {
+        array_push($terms, $k . "=" . $v);
+    }
+    return implode("; ", $terms);
+}
 
 function activitypub_get_url($action, $params = array()) {
     if (count(array_keys($params)) > 0) {
@@ -554,8 +563,8 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
 
         // 엑세스 토큰(Access Token)이 존재하는 목적지인 경우
         $access_token = '';
-        $_access_tokens = activitypub_get_access_tokens();
-        foreach($_access_tokens as $k=>$v) {
+        $access_token_data = activitypub_get_stored_data(ACTIVITYPUB_ACCESS_TOKEN);
+        foreach($access_token_data as $k=>$v) {
             if(strpos($_to, "http://" . $k . "/") !== false || strpos($_to, "https://" . $k . "/") !== false) {
                 $access_token = $v;
                 break;
@@ -1275,18 +1284,22 @@ class _GNUBOARD_ActivityPub {
         return activitypub_json_encode(activitypub_build_collection($items, "Latest shares"));
     }
 
-    public static function authorize() {    // TODO
-        $result = array();
-
+    public static function authorize() {
         $grant_type = $_GET['grant_type'];
 
         switch ($grant_type) {
-            case "authorization_code": break;
-            case "password": break;
-            case "client_credentials": break;
-        }
+            case "authorization_code":
+                return activitypub_json_encode(array("message" => "Sorry. This grant type does not supported yet"));
+                break;
 
-        return activitypub_json_encode($result);
+            case "password":
+                return activitypub_json_encode(array("message" => "Sorry. This grant type does not supported yet"));
+                break;
+
+            case "client_credentials":
+                return activitypub_json_encode(array("message" => "Sorry. This grant type does not supported yet"));
+                break;
+        }
     }
 
     public static function close() {
@@ -1454,7 +1467,7 @@ switch ($route) {
         _GNUBOARD_ActivityPub::close();
         break;
         
-    case "oauth.authorize":  // TODO
+    case "oauth2.authorize":  // TODO
         _GNUBOARD_ActivityPub::open();
         echo _GNUBOARD_ActivityPub::authorize();
         _GNUBOARD_ActivityPub::close();
