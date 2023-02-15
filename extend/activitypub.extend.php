@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <abuse@catswords.net>
 // MIT License
-// 2022-09-28 (version 0.1.14-dev)
+// 2023-02-15 (version 0.1.14-dev)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -109,7 +109,7 @@ function activitypub_json_decode($arr) {
     return json_decode($arr, true);
 }
 
-function activitypub_get_stored_data($s) {
+function activitypub_parse_stored_data($s) {
     $data = array();
 
     $terms = array_filter(array_map("trim", explode(";", $s)));
@@ -242,10 +242,15 @@ function activitypub_add_memo($mb_id, $recv_mb_id, $me_memo) {
     $tmp_row = sql_fetch(" select max(me_id) as max_me_id from {$g5['memo_table']} ");
     $me_id = $tmp_row['max_me_id'] + 1;
 
-    $sql = " insert into {$g5['memo_table']} ( me_recv_mb_id, me_send_mb_id, me_send_datetime, me_memo, me_read_datetime, me_type, me_send_ip ) values ( '$recv_mb_id', '$mb_id', '".G5_TIME_YMDHIS."', '$me_memo', '0000-00-00 00:00:00' , 'recv', '{$_SERVER['REMOTE_ADDR']}' ) ";
+    $sql = " insert into {$g5['memo_table']} ( me_recv_mb_id, me_send_mb_id, me_send_datetime, me_memo, me_read_datetime, me_type, me_send_ip ) values ( '{$recv_mb_id}', '{$mb_id}', '" . G5_TIME_YMDHIS . "', '{$me_memo}', '0000-00-00 00:00:00' , 'recv', '{$_SERVER['REMOTE_ADDR']}' ) ";
     sql_query($sql);
 
     return ($me_id == sql_insert_id() ? $me_id : 0);
+}
+
+function activitypub_get_memo($me_id) {
+    $me = sql_fetch(" select me_memo from {$g5['memo_table']} where me_id = '{$me_id}' ");\
+    return $me['me_memo'];
 }
 
 function activitypub_set_liked($good, $bo_table, $wr_id) {
@@ -591,7 +596,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
 
         // 엑세스 토큰(Access Token)이 존재하는 목적지인 경우
         $access_token = '';
-        $access_token_data = activitypub_get_stored_data(ACTIVITYPUB_ACCESS_TOKEN);
+        $access_token_data = activitypub_parse_stored_data(ACTIVITYPUB_ACCESS_TOKEN);
         foreach($access_token_data as $k=>$v) {
             if(strpos($_to, "http://" . $k . "/") !== false || strpos($_to, "https://" . $k . "/") !== false) {
                 $access_token = $v;
@@ -946,10 +951,34 @@ class _GNUBOARD_ActivityPub {
             return activitypub_json_encode(array("message" => "Could not find the user"));
         }
 
+        // 인증서 정보가 없으면 생성
+        if (!$mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]) {
+            $keypair = activitypub_create_keypair();   // 인증서(공개키, 개인키) 생성
+            $private_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[0]);   // 개인키(Private Key)
+            $public_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[1]);    // 공개키(Public Key)
+
+            // 회원 정보에 등록
+            if ($private_key_id > 0 && $public_key_id > 0) {
+                $stored_certificate_data = activitypub_build_stored_data(array(
+                    "PrivateKeyId" => $private_key_id,
+                    "PublicKeyId" => $public_key_id
+                ));
+                $sql = "update set {$g5['member_table']} " . ACTIVITYPUB_CERTIFICATE_DATAFIELD . " = '{$stored_certificate_data}' where mb_id = '{$mb['mb_id']}'";
+                sql_query($sql);
+            }
+        }
+        
+        // 인증서 정보 불러오기
+        $certificate_data = activitypub_parse_stored_data($mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]);
+        $private_key = activitypub_get_memo($certificate_data['PrivateKeyId']);   // 개인키(Private Key)
+        $public_key = activitypub_get_memo($certificate_data['PublicKeyId']);    // 공개키(Public Key)
+
+        // 본문 생성
+        $activitypub_user_id = activitypub_get_url("user", array("mb_id" => $mb['mb_id']));
         $context = array(
             "@context" => array(NAMESPACE_ACTIVITYSTREAMS, NAMESPACE_W3ID_SECURITY_V1, array("@language" => "ko")),
             "type" => "Person",
-            "id" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
+            "id" => $activitypub_user_id,
             "name" => $mb['mb_name'],
             "preferredUsername" => $mb['mb_nick'],
             "summary" => $mb['mb_profile'],
@@ -963,6 +992,11 @@ class _GNUBOARD_ActivityPub {
             ),
             "endpoints" => array(
                 "sharedInbox" => activitypub_get_url("inbox")
+            ),
+            "publicKey" => array(
+                "id" => $activitypub_user_id . "#main-key",
+                "owner" => $activitypub_user_id,
+                "publicKeyPem" => $public_key
             )
         );
 
