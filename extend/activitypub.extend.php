@@ -63,6 +63,26 @@ function activitypub_load_library($name, $callback) {
     ));
 }
 
+function activitypub_create_keypair() {
+    $keypair = array('', '');
+
+    $privateKeyResource = openssl_pkey_new(array(
+        'private_key_bits' => 2048,
+        'private_key_type' => OPENSSL_KEYTYPE_RSA
+    ));
+
+    // Generate the public key for the private key
+    $privateKeyDetailsArray = openssl_pkey_get_details($privateKeyResource);
+
+    // Export keys to variable
+    $keypair = array($privateKeyResource, $privateKeyDetailsArray['key']);
+
+    // Free the key from memory.
+    openssl_free_key($privateKeyResource);
+
+    return $keypair;
+}
+
 function activitypub_get_library_data($name) {
     global $activitypub_loaded_libraries;
 
