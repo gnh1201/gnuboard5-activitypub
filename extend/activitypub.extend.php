@@ -33,6 +33,7 @@ define("OAUTH2_GRANT_DATAFIELD", "mb_10");    // 회원별 인증 정보를 저�
 define("DEFAULT_HTML_ENTITY_FLAGS", ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
+define("NAMESPACE_W3ID_SECURITY_V1", "https://w3id.org/security/v1");
 define("ACTIVITYPUB_ENABLED_GEOLOCATION", false);   // 위치정보 활성화 (https://lite.ip2location.com/)
 define("NAVERCLOUD_ENABLED_GEOLOCATION", false);   // 국내용 위치정보 활성화 (https://www.ncloud.com/product/applicationService/geoLocation)
 define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설정
@@ -946,7 +947,7 @@ class _GNUBOARD_ActivityPub {
         }
 
         $context = array(
-            "@context" => array(NAMESPACE_ACTIVITYSTREAMS, array("@language" => "ko")),
+            "@context" => array(NAMESPACE_ACTIVITYSTREAMS, NAMESPACE_W3ID_SECURITY_V1, array("@language" => "ko")),
             "type" => "Person",
             "id" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
             "name" => $mb['mb_name'],
