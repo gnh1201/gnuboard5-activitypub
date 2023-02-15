@@ -16,6 +16,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
 //   * https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
 //   * https://github.com/autogestion/pubgate-telegram
+//   * https://blog.joinmastodon.org/2018/06/how-to-implement-a-basic-activitypub-server/
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.14-dev");
