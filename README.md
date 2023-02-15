@@ -24,6 +24,7 @@ ActivityPub implementation for GNUBOARD 5
 - [x] 환율 (koreaexim.go.kr)
 
 ## 향후 지원 예정
+- [ ] `publicKey` 필드 지원
 - [ ] OAuth 2.0
 - [ ] w3id.org 표준 지원
 - [ ] 메시지 큐(Redis, RebbitMQ, Kafka 등) 지원
