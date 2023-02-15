@@ -242,7 +242,7 @@ function activitypub_add_memo($mb_id, $recv_mb_id, $me_memo) {
     $sql = " insert into {$g5['memo_table']} ( me_recv_mb_id, me_send_mb_id, me_send_datetime, me_memo, me_read_datetime, me_type, me_send_ip ) values ( '$recv_mb_id', '$mb_id', '".G5_TIME_YMDHIS."', '$me_memo', '0000-00-00 00:00:00' , 'recv', '{$_SERVER['REMOTE_ADDR']}' ) ";
     sql_query($sql);
 
-    return ($me_id == sql_insert_id());
+    return ($me_id == sql_insert_id() ? $me_id : 0);
 }
 
 function activitypub_set_liked($good, $bo_table, $wr_id) {
