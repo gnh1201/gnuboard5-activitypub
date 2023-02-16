@@ -26,8 +26,10 @@ define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
 define("ACTIVITYPUB_G5_BOARDNAME", "apstreams");
 define("ACTIVITYPUB_G5_TABLENAME", $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME);
 define("ACTIVITYPUB_G5_USERNAME", "apstreams");
-define("ACTIVITYPUB_G5_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
+define("ACTIVITYPUB_G5_OUTDATED_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
+define("ACTIVITYPUB_G5_EXPIRED_DAYS", (empty($config['cf_memo_del']) ? 180 : $config['cf_memo_del']));
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=YOUR_ACCESS_TOKEN; server2.example.org=YOUR_ACCESS_TOKEN;");
+define("ACTIVITYPUB_CERTIFICATE_RETRY", 10);    // 최대 인증서 생성 시도 횟수
 define("ACTIVITYPUB_CERTIFICATE_DATAFIELD", "mb_9");    // 회원별 인증서(공개키, 개인키)를 저장할 필드 (기본: mb_9)
 define("OAUTH2_GRANT_DATAFIELD", "mb_10");    // 회원별 인증 정보를 저장할 필드 (기본: mb_10)
 define("DEFAULT_HTML_ENTITY_FLAGS", ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
@@ -95,37 +97,44 @@ function activitypub_get_stored_keypair($mb) {
 
     $private_key = '';
     $public_key = '';
-    
-    // 인증서 정보 불러오기
-    if ($mb != null && !empty($mb['mb_id'])) {
-        $certificate_data = activitypub_parse_stored_data($mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]);  
-        $private_key = activitypub_get_memo($certificate_data['PrivateKeyId']);    // 개인키(Private Key)
-        $public_key = activitypub_get_memo($certificate_data['PublicKeyId']);     // 공개키(Public Key)
-    }
 
-    // 인증서 정보가 없으면 생성
-    if (!$mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD] || empty($private_key) || empty($public_key)) {
-        $keypair = activitypub_create_keypair();   // 인증서(공개키, 개인키) 생성
-        $private_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[0]);   // 개인키(Private Key)
-        $public_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[1]);    // 공개키(Public Key)
-
-        // 회원 정보에 등록
-        if ($private_key_id > 0 && $public_key_id > 0) {
-            $stored_certificate_data = activitypub_build_stored_data(array(
-                "PrivateKeyId" => $private_key_id,
-                "PublicKeyId" => $public_key_id
-            ));
-            $sql = " update {$g5['member_table']} set " . ACTIVITYPUB_CERTIFICATE_DATAFIELD . " = '{$stored_certificate_data}' where mb_id = '{$mb['mb_id']}' ";
-            sql_query($sql);
+    // 인증서 생성
+    $k = 0;
+    while ($k < ACTIVITYPUB_CERTIFICATE_RETRY && (empty($private_key) || empty($public_key))) {
+        // 인증서 정보 불러오기
+        if ($mb != null && !empty($mb['mb_id'])) {
+            $certificate_data = activitypub_parse_stored_data($mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]);  
+            $private_key = activitypub_get_memo($certificate_data['PrivateKeyId']);    // 개인키(Private Key)
+            $public_key = activitypub_get_memo($certificate_data['PublicKeyId']);     // 공개키(Public Key)
         }
 
-        // 인증서 정보 불러오기
-        $certificate_data = activitypub_parse_stored_data($mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]);  
-        $private_key = activitypub_get_memo($certificate_data['PrivateKeyId']);    // 개인키(Private Key)
-        $public_key = activitypub_get_memo($certificate_data['PublicKeyId']);     // 공개키(Public Key)
+        // 인증서 정보가 없으면 생성
+        if (!$mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD] || empty($private_key) || empty($public_key)) {
+            $keypair = activitypub_create_keypair();   // 인증서(공개키, 개인키) 생성
+            $private_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[0]);   // 개인키(Private Key)
+            $public_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[1]);    // 공개키(Public Key)
 
-        // 회원에게 알림
-        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "외부 서버와 통신하기 위한 인증서가 발급되었습니다. 발급된 인증서는 두가지(개인키, 공개키)입니다. 인증서를 삭제하거나 타인과 공유하지 마세요. A certificate has been issued to communicate with an external server. There are two certificates issued (private key, public key). Do not delete the certificate or share it with others.");
+            // 회원 정보에 등록
+            if ($private_key_id > 0 && $public_key_id > 0) {
+                $stored_certificate_data = activitypub_build_stored_data(array(
+                    "PrivateKeyId" => $private_key_id,
+                    "PublicKeyId" => $public_key_id
+                ));
+                $sql = " update {$g5['member_table']} set " . ACTIVITYPUB_CERTIFICATE_DATAFIELD . " = '{$stored_certificate_data}' where mb_id = '{$mb['mb_id']}' ";
+                sql_query($sql);
+            }
+
+            // 회원에게 알림
+            $messsge1 = "외부 서버와 통신하기 위한 인증서(개인키, 공개키)가 발급되었습니다. 인증서를 타인과 공유하지 마세요. 인증서는 " . ACTIVITYPUB_G5_EXPIRED_DAYS . "일 후 만료됩니다.";
+            $message2 = "The certificate (Private key, Public key) has been issued to communicate with an external server. Do not share it with others. The certificate will expire in " . ACTIVITYPUB_G5_EXPIRED_DAYS . " days.";
+            activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $messsge1 . ' ' . $message2);
+
+            // 회원정보 다시 불러오기
+            $mb = get_member($mb['mb_id']);
+
+            // 시도 횟수 증가
+            $k++;
+        }
     }
 
     return array($private_key, $public_key);
@@ -862,13 +871,13 @@ function activitypub_get_objects($inbox = "inbox", $mb_id = '') {
     if(empty($mb_id)) {
         $sql = "select wr_id from " . ACTIVITYPUB_G5_TABLENAME . "
             where ca_name = '$inbox'
-                and DATE(wr_datetime) BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_NEW_DAYS . " DAY AND CURDATE()
+                and DATE(wr_datetime) BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_OUTDATED_DAYS . " DAY AND CURDATE()
         ";
     } else {
         $sql = "select wr_id from " . ACTIVITYPUB_G5_TABLENAME . "
             where ca_name = '$inbox'
                 and FIND_IN_SET('$mb_id', wr_7) > 0
-                and DATE(wr_datetime) BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_NEW_DAYS . " DAY AND CURDATE()
+                and DATE(wr_datetime) BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_OUTDATED_DAYS . " DAY AND CURDATE()
         ";
     }
     $result = sql_query($sql);
@@ -1313,7 +1322,7 @@ class _GNUBOARD_ActivityPub {
     
     public static function shares() {
         global $g5;
-        
+
         // 게시판인 경우
         if (array_key_exists("bo_table", $_GET)) {
             $bo = get_board_db($_GET['bo_table'], true);
@@ -1344,7 +1353,7 @@ class _GNUBOARD_ActivityPub {
                         if ($pages_rows < 1) {
                             $page_rows = 15;
                         }
-                        
+
                         // SQL 작성
                         $write_table = $g5['write_prefix'] . $bo['bo_table'];
                         $offset = ($page - 1) * $page_rows;
