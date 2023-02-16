@@ -73,13 +73,13 @@ function activitypub_create_keypair() {
         'private_key_bits' => 2048,
         'private_key_type' => OPENSSL_KEYTYPE_RSA
     ));
-	
-	// Export the private key
-	openssl_pkey_export($privateKeyResource, $privateKey);
+    
+    // Export the private key
+    openssl_pkey_export($privateKeyResource, $privateKey);
 
     // Generate the public key for the private key
     $privateKeyDetailsArray = openssl_pkey_get_details($privateKeyResource);
-	$publicKey = $privateKeyDetailsArray['key'];
+    $publicKey = $privateKeyDetailsArray['key'];
 
     // Export keys to variable
     $keypair = array($privateKey, $publicKey);
@@ -88,6 +88,47 @@ function activitypub_create_keypair() {
     openssl_free_key($privateKeyResource);
 
     return $keypair;
+}
+
+function activitypub_get_stored_keypair($mb) {
+    global $g5;
+
+    $private_key = '';
+    $public_key = '';
+    
+    // 인증서 정보 불러오기
+    if ($mb != null && !empty($mb['mb_id'])) {
+        $certificate_data = activitypub_parse_stored_data($mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]);  
+        $private_key = activitypub_get_memo($certificate_data['PrivateKeyId']);    // 개인키(Private Key)
+        $public_key = activitypub_get_memo($certificate_data['PublicKeyId']);     // 공개키(Public Key)
+    }
+
+    // 인증서 정보가 없으면 생성
+    if (!$mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD] || empty($private_key) || empty($public_key)) {
+        $keypair = activitypub_create_keypair();   // 인증서(공개키, 개인키) 생성
+        $private_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[0]);   // 개인키(Private Key)
+        $public_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[1]);    // 공개키(Public Key)
+
+        // 회원 정보에 등록
+        if ($private_key_id > 0 && $public_key_id > 0) {
+            $stored_certificate_data = activitypub_build_stored_data(array(
+                "PrivateKeyId" => $private_key_id,
+                "PublicKeyId" => $public_key_id
+            ));
+            $sql = " update {$g5['member_table']} set " . ACTIVITYPUB_CERTIFICATE_DATAFIELD . " = '{$stored_certificate_data}' where mb_id = '{$mb['mb_id']}' ";
+            sql_query($sql);
+        }
+
+        // 인증서 정보 불러오기
+        $certificate_data = activitypub_parse_stored_data($mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]);  
+        $private_key = activitypub_get_memo($certificate_data['PrivateKeyId']);    // 개인키(Private Key)
+        $public_key = activitypub_get_memo($certificate_data['PublicKeyId']);     // 공개키(Public Key)
+
+        // 회원에게 알림
+        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "외부 서버와 통신하기 위한 인증서가 발급되었습니다. 발급된 인증서는 두가지(개인키, 공개키)입니다. 인증서를 삭제하거나 타인과 공유하지 마세요. A certificate has been issued to communicate with an external server. There are two certificates issued (private key, public key). Do not delete the certificate or share it with others.");
+    }
+
+    return array($private_key, $public_key);
 }
 
 function activitypub_get_library_data($name) {
@@ -253,7 +294,7 @@ function activitypub_add_memo($mb_id, $recv_mb_id, $me_memo) {
 }
 
 function activitypub_get_memo($me_id) {
-	global $g5;
+    global $g5;
 
     $me = sql_fetch(" select me_memo from {$g5['memo_table']} where me_id = '{$me_id}' ");
     return $me['me_memo'];
@@ -278,11 +319,13 @@ function activitypub_build_http_headers($headers) {
 }
 
 function activitypub_http_get($url, $access_token = '') {
+    // make HTTP header
     $headers = array("Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
     if (!empty($access_token)) {
         $headers["Authorization"] = "Bearer " . $access_token;
     }
 
+    // do HTTP request
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
@@ -315,12 +358,17 @@ function activitypub_get_attachments($bo_table, $wr_id) {
     return $attachments;
 }
 
-function activitypub_http_post($url, $rawdata, $access_token = '') {
+function activitypub_http_post($url, $raw_data, $access_token = '', $mb = null) {
+    // make HTTP header
     $headers = array("Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
     if (!empty($access_token)) {
         $headers["Authorization"] = "Bearer " . $access_token;
     }
+    list($private_key, $public_key) = activitypub_get_stored_keypair($mb);
 
+    // TODO: make Signature header
+
+    // do HTTP request
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
@@ -328,7 +376,7 @@ function activitypub_http_post($url, $rawdata, $access_token = '') {
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POSTFIELDS => $rawdata,
+        CURLOPT_POSTFIELDS => $raw_data,
         CURLOPT_POST => true
     ));
     $response = curl_exec($ch);
@@ -951,35 +999,14 @@ class _GNUBOARD_ActivityPub {
     }
 
     public static function user() {
-		global $g5;
-
         $mb = get_member($_GET['mb_id']);
 
         if (!$mb['mb_id']) {
             return activitypub_json_encode(array("message" => "Could not find the user"));
         }
 
-        // 인증서 정보가 없으면 생성
-        if (!$mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]) {
-            $keypair = activitypub_create_keypair();   // 인증서(공개키, 개인키) 생성
-            $private_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[0]);   // 개인키(Private Key)
-            $public_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[1]);    // 공개키(Public Key)
-
-            // 회원 정보에 등록
-            if ($private_key_id > 0 && $public_key_id > 0) {
-                $stored_certificate_data = activitypub_build_stored_data(array(
-                    "PrivateKeyId" => $private_key_id,
-                    "PublicKeyId" => $public_key_id
-                ));
-                $sql = " update {$g5['member_table']} set " . ACTIVITYPUB_CERTIFICATE_DATAFIELD . " = '{$stored_certificate_data}' where mb_id = '{$mb['mb_id']}' ";
-                sql_query($sql);
-            }
-        }
-
         // 인증서 정보 불러오기
-        $certificate_data = activitypub_parse_stored_data($mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]);
-        $private_key = activitypub_get_memo($certificate_data['PrivateKeyId']);   // 개인키(Private Key)
-        $public_key = activitypub_get_memo($certificate_data['PublicKeyId']);    // 공개키(Public Key)
+        list($private_key, $public_key) = activitypub_get_stored_keypair($mb);
 
         // 본문 생성
         $activitypub_user_id = activitypub_get_url("user", array("mb_id" => $mb['mb_id']));
