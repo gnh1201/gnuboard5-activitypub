@@ -861,14 +861,14 @@ function activitypub_update_activity($inbox = "inbox", $data, $mb = array("mb_id
     return $wr_id;
 }
 
-function activitypub_get_objects($inbox = "inbox", $mb_id = '') {
+function activitypub_get_objects($mb, $inbox = "inbox") {
     global $g5;
 
     $items = array();
 
     // 정보 불러오기
     $sql = "";
-    if(empty($mb_id)) {
+    if(!$mb['mb_id']) {
         $sql = "select wr_id from " . ACTIVITYPUB_G5_TABLENAME . "
             where ca_name = '$inbox'
                 and DATE(wr_datetime) BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_OUTDATED_DAYS . " DAY AND CURDATE()
@@ -1283,7 +1283,7 @@ class _GNUBOARD_ActivityPub {
 
             case "GET":
                 $mb = get_member($_GET['mb_id']);
-                return activitypub_json_encode(activitypub_get_activities("inbox", $mb['mb_id']));
+                return activitypub_json_encode(activitypub_get_objects($mb, "inbox"));
 
             default:
                 return activitypub_json_encode(array("message" => "Not supported method"));
@@ -1302,7 +1302,7 @@ class _GNUBOARD_ActivityPub {
             // 가장 최근의 활동을 가져옴
             case "GET":
                 $mb = get_member($_GET['mb_id']);
-                return activitypub_json_encode(activitypub_get_activities("outbox", $mb['mb_id']));
+                return activitypub_json_encode(activitypub_get_objects($mb, "outbox"));
         }
     }
 
