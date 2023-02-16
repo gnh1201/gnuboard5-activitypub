@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <abuse@catswords.net>
 // MIT License
-// 2023-02-15 (version 0.1.14-dev)
+// 2023-02-16 (version 0.1.14-dev)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -73,12 +73,16 @@ function activitypub_create_keypair() {
         'private_key_bits' => 2048,
         'private_key_type' => OPENSSL_KEYTYPE_RSA
     ));
+	
+	// Export the private key
+	openssl_pkey_export($privateKeyResource, $privateKey);
 
     // Generate the public key for the private key
     $privateKeyDetailsArray = openssl_pkey_get_details($privateKeyResource);
+	$publicKey = $privateKeyDetailsArray['key'];
 
     // Export keys to variable
-    $keypair = array($privateKeyResource, $privateKeyDetailsArray['key']);
+    $keypair = array($privateKey, $publicKey);
 
     // Free the key from memory.
     openssl_free_key($privateKeyResource);
@@ -116,7 +120,7 @@ function activitypub_parse_stored_data($s) {
     foreach($terms as $term) {
         list($k, $v) = explode('=', $term);
         $k = html_entity_decode($k, DEFAULT_HTML_ENTITY_FLAGS, 'UTF-8');
-        $v = html_entity_decode($k, DEFAULT_HTML_ENTITY_FLAGS, 'UTF-8');
+        $v = html_entity_decode($v, DEFAULT_HTML_ENTITY_FLAGS, 'UTF-8');
         $data[$k] = $v;
     }
 
@@ -249,7 +253,9 @@ function activitypub_add_memo($mb_id, $recv_mb_id, $me_memo) {
 }
 
 function activitypub_get_memo($me_id) {
-    $me = sql_fetch(" select me_memo from {$g5['memo_table']} where me_id = '{$me_id}' ");\
+	global $g5;
+
+    $me = sql_fetch(" select me_memo from {$g5['memo_table']} where me_id = '{$me_id}' ");
     return $me['me_memo'];
 }
 
@@ -945,6 +951,8 @@ class _GNUBOARD_ActivityPub {
     }
 
     public static function user() {
+		global $g5;
+
         $mb = get_member($_GET['mb_id']);
 
         if (!$mb['mb_id']) {
@@ -963,11 +971,11 @@ class _GNUBOARD_ActivityPub {
                     "PrivateKeyId" => $private_key_id,
                     "PublicKeyId" => $public_key_id
                 ));
-                $sql = "update set {$g5['member_table']} " . ACTIVITYPUB_CERTIFICATE_DATAFIELD . " = '{$stored_certificate_data}' where mb_id = '{$mb['mb_id']}'";
+                $sql = " update {$g5['member_table']} set " . ACTIVITYPUB_CERTIFICATE_DATAFIELD . " = '{$stored_certificate_data}' where mb_id = '{$mb['mb_id']}' ";
                 sql_query($sql);
             }
         }
-        
+
         // 인증서 정보 불러오기
         $certificate_data = activitypub_parse_stored_data($mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]);
         $private_key = activitypub_get_memo($certificate_data['PrivateKeyId']);   // 개인키(Private Key)
