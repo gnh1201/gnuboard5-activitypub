@@ -1517,17 +1517,15 @@ while ($entry = $tmp->read()) {
 $route = array_key_exists("route", $_GET) ? $_GET['route'] : "";
 
 switch ($route) {
-    // 액펍(ActivityPub)과 웹핑거(WebFinger)는 다른 개념이지만, 여기서는 액펍(ActivityPub) 전용으로 사용한다.
-    // 액펍(ActivityPub)에서 사용자를 조회하기 전단계에서 이뤄지는 요청이다.
-    //
-    // .htaccess에 추가 (추가해야만 그누보드 외 다른 플랫폼과 통신 가능, 그누보드 사이에서만 연결할 경우 필수사항 아님)
+    // 일부 소프트웨어는 통신을 하기 위해 위해 아래와 같이 설정을 해야할 수 있습니다. (선택사항)
+    // .htaccess에 추가
     //
     //     <IfModule mod_rewrite.c>
     //         RewriteEngine on
     //         RewriteRule ^\.well-known/webfinger /?route=webfinger [QSA,L]
     //     </IfModule>
     //
-    // Reference: https://wordpress.org/support/topic/htaccess-conflict/
+    // 참고: https://wordpress.org/support/topic/htaccess-conflict/
     //
     case "webfinger":
         _GNUBOARD_ActivityPub::open();
