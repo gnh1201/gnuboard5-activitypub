@@ -1323,9 +1323,9 @@ class _GNUBOARD_ActivityPub {
     public static function shares() {
         global $g5;
 
-		$items = array();  // 항목을 담을 배열
+        $items = array();  // 항목을 담을 배열
 
-		/* // TODO: remove
+        /* // TODO: Remove (Security Reason)
         // 게시판인 경우
         if (array_key_exists("bo_table", $_GET)) {
             $bo = get_board_db($_GET['bo_table'], true);
@@ -1372,23 +1372,23 @@ class _GNUBOARD_ActivityPub {
                         }
                 }
             }
-        } else {   // 게시판이 아닌 경우
-            // 최근 활동에서 추출
-            $sql = "select * from " . $g5['board_new_table']; 
-            $result = sql_query($sql);
-            while ($row = sql_fetch_array($result)) {
-                $write_table = $g5['write_prefix'] . $row['bo_table'];
-                $sql2 = "select wr_id, mb_id, wr_content, wr_datetime from {$write_table} where wr_id = '{$row['wr_id']}' and FIND_IN_SET('secret', wr_option) = 0 ";
-                $row2 = sql_fetch($sql2);
-                if ($row2['wr_id']) {
-                    $object_id = G5_BBS_URL . "/board.php?bo_table={$row['bo_table']}&wr_id={$row2['wr_id']}";
-                    $mb = get_member($row2['mb_id']);
-                    $content = $row2['wr_content'];
-                    array_push($items, activitypub_build_note($content, $object_id, $mb));
-                }
+        }
+        */
+
+        // 최근 활동에서 추출
+        $sql = "select * from " . $g5['board_new_table']; 
+        $result = sql_query($sql);
+        while ($row = sql_fetch_array($result)) {
+            $write_table = $g5['write_prefix'] . $row['bo_table'];
+            $sql2 = "select wr_id, mb_id, wr_content, wr_datetime from {$write_table} where wr_id = '{$row['wr_id']}' and FIND_IN_SET('secret', wr_option) = 0 ";
+            $row2 = sql_fetch($sql2);
+            if ($row2['wr_id']) {
+                $object_id = G5_BBS_URL . "/board.php?bo_table={$row['bo_table']}&wr_id={$row2['wr_id']}";
+                $mb = get_member($row2['mb_id']);
+                $content = $row2['wr_content'];
+                array_push($items, activitypub_build_note($content, $object_id, $mb));
             }
         }
-		*/
 
         // 결과 반환
         return activitypub_json_encode(activitypub_build_collection($items, "Latest shares"));
