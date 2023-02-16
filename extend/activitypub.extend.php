@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <abuse@catswords.net>
 // MIT License
-// 2022-09-28 (version 0.1.14-dev)
+// 2023-02-16 (version 0.1.14-dev)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -16,6 +16,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
 //   * https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
 //   * https://github.com/autogestion/pubgate-telegram
+//   * https://blog.joinmastodon.org/2018/06/how-to-implement-a-basic-activitypub-server/
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.14-dev");
@@ -26,11 +27,13 @@ define("ACTIVITYPUB_G5_BOARDNAME", "apstreams");
 define("ACTIVITYPUB_G5_TABLENAME", $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME);
 define("ACTIVITYPUB_G5_USERNAME", "apstreams");
 define("ACTIVITYPUB_G5_NEW_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
-define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=xxuPtHDkMgYQfcy9; server2.example.org=PC6ujkjQXhL6lUtS;");
+define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=YOUR_ACCESS_TOKEN; server2.example.org=YOUR_ACCESS_TOKEN;");
+define("ACTIVITYPUB_CERTIFICATE_DATAFIELD", "mb_9");    // 회원별 인증서(공개키, 개인키)를 저장할 필드 (기본: mb_9)
 define("OAUTH2_GRANT_DATAFIELD", "mb_10");    // 회원별 인증 정보를 저장할 필드 (기본: mb_10)
 define("DEFAULT_HTML_ENTITY_FLAGS", ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
+define("NAMESPACE_W3ID_SECURITY_V1", "https://w3id.org/security/v1");
 define("ACTIVITYPUB_ENABLED_GEOLOCATION", false);   // 위치정보 활성화 (https://lite.ip2location.com/)
 define("NAVERCLOUD_ENABLED_GEOLOCATION", false);   // 국내용 위치정보 활성화 (https://www.ncloud.com/product/applicationService/geoLocation)
 define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설정
@@ -63,6 +66,30 @@ function activitypub_load_library($name, $callback) {
     ));
 }
 
+function activitypub_create_keypair() {
+    $keypair = array('', '');
+
+    $privateKeyResource = openssl_pkey_new(array(
+        'private_key_bits' => 2048,
+        'private_key_type' => OPENSSL_KEYTYPE_RSA
+    ));
+	
+	// Export the private key
+	openssl_pkey_export($privateKeyResource, $privateKey);
+
+    // Generate the public key for the private key
+    $privateKeyDetailsArray = openssl_pkey_get_details($privateKeyResource);
+	$publicKey = $privateKeyDetailsArray['key'];
+
+    // Export keys to variable
+    $keypair = array($privateKey, $publicKey);
+
+    // Free the key from memory.
+    openssl_free_key($privateKeyResource);
+
+    return $keypair;
+}
+
 function activitypub_get_library_data($name) {
     global $activitypub_loaded_libraries;
 
@@ -86,14 +113,14 @@ function activitypub_json_decode($arr) {
     return json_decode($arr, true);
 }
 
-function activitypub_get_stored_data($s) {
+function activitypub_parse_stored_data($s) {
     $data = array();
 
     $terms = array_filter(array_map("trim", explode(";", $s)));
     foreach($terms as $term) {
         list($k, $v) = explode('=', $term);
         $k = html_entity_decode($k, DEFAULT_HTML_ENTITY_FLAGS, 'UTF-8');
-        $v = html_entity_decode($k, DEFAULT_HTML_ENTITY_FLAGS, 'UTF-8');
+        $v = html_entity_decode($v, DEFAULT_HTML_ENTITY_FLAGS, 'UTF-8');
         $data[$k] = $v;
     }
 
@@ -219,10 +246,17 @@ function activitypub_add_memo($mb_id, $recv_mb_id, $me_memo) {
     $tmp_row = sql_fetch(" select max(me_id) as max_me_id from {$g5['memo_table']} ");
     $me_id = $tmp_row['max_me_id'] + 1;
 
-    $sql = " insert into {$g5['memo_table']} ( me_recv_mb_id, me_send_mb_id, me_send_datetime, me_memo, me_read_datetime, me_type, me_send_ip ) values ( '$recv_mb_id', '$mb_id', '".G5_TIME_YMDHIS."', '$me_memo', '0000-00-00 00:00:00' , 'recv', '{$_SERVER['REMOTE_ADDR']}' ) ";
+    $sql = " insert into {$g5['memo_table']} ( me_recv_mb_id, me_send_mb_id, me_send_datetime, me_memo, me_read_datetime, me_type, me_send_ip ) values ( '{$recv_mb_id}', '{$mb_id}', '" . G5_TIME_YMDHIS . "', '{$me_memo}', '0000-00-00 00:00:00' , 'recv', '{$_SERVER['REMOTE_ADDR']}' ) ";
     sql_query($sql);
 
-    return ($me_id == sql_insert_id());
+    return ($me_id == sql_insert_id() ? $me_id : 0);
+}
+
+function activitypub_get_memo($me_id) {
+	global $g5;
+
+    $me = sql_fetch(" select me_memo from {$g5['memo_table']} where me_id = '{$me_id}' ");
+    return $me['me_memo'];
 }
 
 function activitypub_set_liked($good, $bo_table, $wr_id) {
@@ -568,7 +602,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
 
         // 엑세스 토큰(Access Token)이 존재하는 목적지인 경우
         $access_token = '';
-        $access_token_data = activitypub_get_stored_data(ACTIVITYPUB_ACCESS_TOKEN);
+        $access_token_data = activitypub_parse_stored_data(ACTIVITYPUB_ACCESS_TOKEN);
         foreach($access_token_data as $k=>$v) {
             if(strpos($_to, "http://" . $k . "/") !== false || strpos($_to, "https://" . $k . "/") !== false) {
                 $access_token = $v;
@@ -917,16 +951,42 @@ class _GNUBOARD_ActivityPub {
     }
 
     public static function user() {
+		global $g5;
+
         $mb = get_member($_GET['mb_id']);
 
         if (!$mb['mb_id']) {
             return activitypub_json_encode(array("message" => "Could not find the user"));
         }
 
+        // 인증서 정보가 없으면 생성
+        if (!$mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]) {
+            $keypair = activitypub_create_keypair();   // 인증서(공개키, 개인키) 생성
+            $private_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[0]);   // 개인키(Private Key)
+            $public_key_id = activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $keypair[1]);    // 공개키(Public Key)
+
+            // 회원 정보에 등록
+            if ($private_key_id > 0 && $public_key_id > 0) {
+                $stored_certificate_data = activitypub_build_stored_data(array(
+                    "PrivateKeyId" => $private_key_id,
+                    "PublicKeyId" => $public_key_id
+                ));
+                $sql = " update {$g5['member_table']} set " . ACTIVITYPUB_CERTIFICATE_DATAFIELD . " = '{$stored_certificate_data}' where mb_id = '{$mb['mb_id']}' ";
+                sql_query($sql);
+            }
+        }
+
+        // 인증서 정보 불러오기
+        $certificate_data = activitypub_parse_stored_data($mb[ACTIVITYPUB_CERTIFICATE_DATAFIELD]);
+        $private_key = activitypub_get_memo($certificate_data['PrivateKeyId']);   // 개인키(Private Key)
+        $public_key = activitypub_get_memo($certificate_data['PublicKeyId']);    // 공개키(Public Key)
+
+        // 본문 생성
+        $activitypub_user_id = activitypub_get_url("user", array("mb_id" => $mb['mb_id']));
         $context = array(
-            "@context" => array(NAMESPACE_ACTIVITYSTREAMS, array("@language" => "ko")),
+            "@context" => array(NAMESPACE_ACTIVITYSTREAMS, NAMESPACE_W3ID_SECURITY_V1, array("@language" => "ko")),
             "type" => "Person",
-            "id" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
+            "id" => $activitypub_user_id,
             "name" => $mb['mb_name'],
             "preferredUsername" => $mb['mb_nick'],
             "summary" => $mb['mb_profile'],
@@ -940,6 +1000,11 @@ class _GNUBOARD_ActivityPub {
             ),
             "endpoints" => array(
                 "sharedInbox" => activitypub_get_url("inbox")
+            ),
+            "publicKey" => array(
+                "id" => $activitypub_user_id . "#main-key",
+                "owner" => $activitypub_user_id,
+                "publicKeyPem" => $public_key
             )
         );
 
