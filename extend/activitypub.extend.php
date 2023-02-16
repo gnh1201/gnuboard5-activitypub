@@ -125,7 +125,7 @@ function activitypub_get_stored_keypair($mb) {
         $public_key = activitypub_get_memo($certificate_data['PublicKeyId']);     // 공개키(Public Key)
 
         // 회원에게 알림
-        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "외부 서버와 통신하기 위한 인증서가 발급되었습니다. 발급된 인증서는 두가지(개인키, 공개키)입니다. 인증서를 삭제하거나 타인과 공유하지 마세요. A certificate has been issued to communicate with an external server. There are two certificates issued (private key, public key). Do not delete the certificate or share it with others.");
+        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "외부 서버와 통신하기 위한 인증서(개인키, 공개키)가 발급되었습니다. 인증서를 타인과 공유하지 마세요. A certificate (private key, public key) has been issued to communicate with an external server. Do not share it with others.");
     }
 
     return array($private_key, $public_key);
