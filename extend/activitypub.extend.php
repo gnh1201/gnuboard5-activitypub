@@ -1313,7 +1313,7 @@ class _GNUBOARD_ActivityPub {
     
     public static function shares() {
         global $g5;
-        
+
         // 게시판인 경우
         if (array_key_exists("bo_table", $_GET)) {
             $bo = get_board_db($_GET['bo_table'], true);
@@ -1344,7 +1344,7 @@ class _GNUBOARD_ActivityPub {
                         if ($pages_rows < 1) {
                             $page_rows = 15;
                         }
-                        
+
                         // SQL 작성
                         $write_table = $g5['write_prefix'] . $bo['bo_table'];
                         $offset = ($page - 1) * $page_rows;
