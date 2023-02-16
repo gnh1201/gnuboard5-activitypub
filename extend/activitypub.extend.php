@@ -1517,7 +1517,7 @@ while ($entry = $tmp->read()) {
 $route = array_key_exists("route", $_GET) ? $_GET['route'] : "";
 
 switch ($route) {
-    // 일부 소프트웨어는 통신을 하기 위해 위해 아래와 같이 설정을 해야할 수 있습니다. (선택사항)
+    // 일부 소프트웨어는 통신을 하기 위해 아래와 같이 설정을 해야할 수 있습니다. (선택사항)
     // .htaccess에 추가
     //
     //     <IfModule mod_rewrite.c>
