@@ -125,8 +125,8 @@ function activitypub_get_stored_keypair($mb) {
             }
 
             // 회원에게 알림
-            $messsge1 = "외부 서버와 통신하기 위한 인증서(개인키, 공개키)가 발급되었습니다. 인증서를 타인과 공유하지 마세요. 인증서는 " . ACTIVITYPUB_G5_EXPIRED_DAYS . "일 후 만료됩니다.";
-            $message2 = "The certificate (Private key, Public key) has been issued to communicate with an external server. Do not share it with others. The certificate will expire in " . ACTIVITYPUB_G5_EXPIRED_DAYS . " days.";
+            $messsge1 = "[시스템] 외부 서버와 통신하기 위한 인증서(개인키, 공개키)가 발급되었습니다. 인증서를 타인과 공유하지 마세요. 인증서는 " . ACTIVITYPUB_G5_EXPIRED_DAYS . "일 후 만료됩니다.";
+            $message2 = "[System] The certificate (Private key, Public key) has been issued to communicate with an external server. Do not share it with others. The certificate will expire in " . ACTIVITYPUB_G5_EXPIRED_DAYS . " days.";
             activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], $messsge1 . ' ' . $message2);
 
             // 회원정보 다시 불러오기
@@ -1323,6 +1323,9 @@ class _GNUBOARD_ActivityPub {
     public static function shares() {
         global $g5;
 
+		$items = array();  // 항목을 담을 배열
+
+		/* // TODO: remove
         // 게시판인 경우
         if (array_key_exists("bo_table", $_GET)) {
             $bo = get_board_db($_GET['bo_table'], true);
@@ -1333,7 +1336,7 @@ class _GNUBOARD_ActivityPub {
                         return self::inbox();   // 액티비티를 저장하는 테이블인 경우 inbox와 동일하게 취급
 
                     default:
-                        $items = array();  // 항목을 담을 배열
+                        
 
                         // 조회할 페이지 수 불러오기
                         $page = intval($_GET['page']);
@@ -1385,6 +1388,7 @@ class _GNUBOARD_ActivityPub {
                 }
             }
         }
+		*/
 
         // 결과 반환
         return activitypub_json_encode(activitypub_build_collection($items, "Latest shares"));
