@@ -904,7 +904,7 @@ function activitypub_get_objects($mb, $inbox = "inbox") {
 function activitypub_build_note($content, $object_id, $mb, $_added_object = array()) {
     return array_merge(array(
         "type" => "Note",
-        "generator" => "GNUBOARD5-ActivityPub/" . ACTIVITYPUB_INSTANCE_VERSION . " (" . ACTIVITYPUB_INSTANCE_ID . ")",
+        "generator" => "G5.ActivityPub/" . ACTIVITYPUB_INSTANCE_VERSION . " (GNUBOARD " . G5_GNUBOARD_VER . "; " . ACTIVITYPUB_INSTANCE_ID . ")",
         "id" => $object_id,
         "attributedTo" => activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
         "content" => $content,
@@ -916,7 +916,7 @@ function activitypub_build_note($content, $object_id, $mb, $_added_object = arra
 function activitypub_build_collection($items, $summary = '') {
     return array(
         "@context" => NAMESPACE_ACTIVITYSTREAMS,
-        "generator" => "GNUBOARD5-ActivityPub/" . ACTIVITYPUB_INSTANCE_VERSION . " (" . ACTIVITYPUB_INSTANCE_ID . ")",
+        "generator" => "G5.ActivityPub/" . ACTIVITYPUB_INSTANCE_VERSION . " (GNUBOARD " . G5_GNUBOARD_VER . "; " . ACTIVITYPUB_INSTANCE_ID . ")",
         "summary" => $summary,
         "type" => "Collection",
         "totalItems" => count($items),
