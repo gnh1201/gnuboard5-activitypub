@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <abuse@catswords.net>
 // MIT License
-// 2023-02-16 (version 0.1.14-dev)
+// 2023-04-18 (version 0.1.14-dev)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -20,8 +20,10 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.14-dev");
+define("ACTIVITYPUB_DEFAULT_SCHEME", "https");    // 외부 통신용 스킴 (SSL 사용이 기본)
+define("ACTIVITYPUB_INSECURE_SCHEME", "http");    // 그누보드5 ActivityPub 통신용 스킴 (SSL 사용을 하지 않을 수도 있음을 고려)
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
-define("ACTIVITYPUB_URL", (empty(G5_URL) ? "http://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
+define("ACTIVITYPUB_URL", (empty(G5_URL) ? ACTIVITYPUB_INSECURE_SCHEME . "://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
 define("ACTIVITYPUB_G5_BOARDNAME", "apstreams");
 define("ACTIVITYPUB_G5_TABLENAME", $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME);
@@ -328,7 +330,7 @@ function activitypub_build_http_headers($headers) {
 }
 
 function activitypub_http_get($url, $access_token = '') {
-    // make HTTP header
+    // write a HTTP header
     $headers = array("Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
     if (!empty($access_token)) {
         $headers["Authorization"] = "Bearer " . $access_token;
@@ -584,11 +586,11 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
                 $account_ctx = array("username" => $account_terms[0], "host" => $account_terms[1]);
                 if (!empty($account_ctx['host'])) {
                     // 공통 WebFinger에 연결
-                    $webfigner_ctx = activitypub_http_get("http://" . $account_ctx['host'] . "/.well-known/webfinger?resource=acct:" . $account);
+                    $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_DEFAULT_SCHEME . "://" . $account_ctx['host'] . "/.well-known/webfinger?resource=acct:" . $account);
 
                     // 실패시, 그누5 전용 WebFinger에 연결
                     if ($webfigner_ctx['subject'] != ("acct:" . $account)) {
-                        $webfigner_ctx = activitypub_http_get("http://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
+                        $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_INSECURE_SCHEME . "://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
                     }
 
                     // 한번 더 확인
