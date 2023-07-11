@@ -5,7 +5,7 @@ ActivityPub implementation for GNUBOARD 5
   * `apstreams` 게시판 추가
   * `apstreams` 사용자 추가
 
-## 작업진행
+## 지원현황
 - [x] WebFinger
 - [x] User
 - [x] Inbox
@@ -16,17 +16,18 @@ ActivityPub implementation for GNUBOARD 5
 - [ ] Shares (개선 진행 중)
 - [x] Geolocation (IP2Location, Naver Cloud)
 - [x] File attachment
-- [ ] File attachment -> Auto sharing (Download/Upload)
+- [ ] File attachment - Automatically download a file to the local server
+- [x] Digest/Signature
+- [ ] Digest/Signature - Verification
+- [x] w3id.org (e.g. the `publicKey` field of an actor)
+- [ ] OAuth 2.0
+- [ ] Message Queue Compatible (e.g. Redis, RebbitMQ, Kafka)
 
 ## 부가기능 (옵션)
 - [x] 아바타 (gravatar.com)
 - [x] 날씨 (openweathermap.org)
 - [x] 환율 (koreaexim.go.kr)
 
-## 향후 지원 예정
-- [ ] OAuth 2.0
-- [ ] w3id.org (`publicKey` 필드) 지원
-- [ ] 메시지 큐(Redis, RebbitMQ, Kafka 등) 지원
 
 ## 전문 예시
 
