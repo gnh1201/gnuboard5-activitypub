@@ -329,16 +329,45 @@ function activitypub_build_http_headers($headers) {
     return $lines;
 }
 
-function activitypub_build_date() {
-    $tz = new DateTimeZone('GMT');
-    $dt = new DateTime('now', $tz);
-    return $dt->format('d M Y H:i:s e');    // e.g. 18 Dec 2019 10:08:46 GMT
+function activitypub_build_date($dateString='now') {
+    // e.g. 18 Dec 2019 10:08:46 GMT
+    $dt = ($dateString == "now" ? new DateTime('now', new DateTimeZone('GMT')) : DateTime::createFromFormat('d M Y H:i:s e', $dateString));
+    return $dt->format('d M Y H:i:s e');
+}
+
+function activitypub_build_digest($body) {
+    $digest = hash('sha256', $body, true);
+    $digest = base64_encode($digest);
+    $digest = 'sha-256=' . $digest;
+    return $digest;
+}
+
+function activitypub_build_signature($url, $date, $digest, $private_key, $mb = null, $method="POST") {
+    // get host and path from URL
+    list($host, $path) = array(parse_url($url, PHP_URL_HOST), parse_url($url, PHP_URL_PATH));
+
+    // build a key id
+    $activitypub_user_id = activitypub_get_url("user", array("mb_id" => $mb['mb_id']));
+    $keyId = $activitypub_user_id . "#main-key";
+
+    // build a target data to get signature
+    $signature = $method . ' ' . $path . "\n" .
+        'HOST: ' . $host . "\n" .
+        'Date: ' . $date . "\n" .
+        'Digest: ' . $digest;
+
+    // create a signature
+    openssl_sign($signature, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+    $signature = base64_encode($signature);
+
+    // create a signature header
+    return 'keyId="' . $keyId . '",headers="(request-target) host date digest",signature="' . $signature . '"';
 }
 
 function activitypub_http_get($url, $access_token = '') {
     // build the header
     $headers = array(
-        "Date" => activitypub_build_date(),
+        "Date" => activitypub_build_date('now'),
         "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\""
     );
     if (!empty($access_token)) {
@@ -379,17 +408,23 @@ function activitypub_get_attachments($bo_table, $wr_id) {
 }
 
 function activitypub_http_post($url, $raw_data, $access_token = '', $mb = null) {
-    // make HTTP header
+    // get digest
+    $date = activitypub_build_date('now');
+    $digest = activitypub_build_digest($raw_data);
+    
+    // build the headers
     $headers = array(
-        "Date" => activitypub_build_date(),
-        "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\""
+        "Date" => $date,
+        "Digest" => $digest,
+        "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
     );
     if (!empty($access_token)) {
         $headers["Authorization"] = "Bearer " . $access_token;
     }
     list($private_key, $public_key) = activitypub_get_stored_keypair($mb);
 
-    // TODO: Add Signature header
+    // build the signature
+    $signature = activitypub_build_signature($url, $date, $digest, $private_key, $mb, "POST");
 
     // request
     $ch = curl_init();
@@ -694,7 +729,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
         }
 
         // inbox로 데이터 전송
-        $response = activitypub_http_post($remote_inbox_url, $rawdata, $access_token);
+        $response = activitypub_http_post($remote_inbox_url, $rawdata, $access_token, $mb);
     }
 
     // 발행됨(Published)으로 상태 업데이트
