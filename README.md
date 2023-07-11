@@ -116,6 +116,8 @@ ActivityPub implementation for GNUBOARD 5
 * https://socialhub.activitypub.rocks/t/posting-to-pleroma-inbox/1184
 * https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
 * https://github.com/autogestion/pubgate-telegram
+* https://docs.joinmastodon.org/spec/security/
+* https://chat.openai.com/share/4fda7974-cc0b-439a-b0f2-dc828f8acfef
 
 ## 문의
 * abuse@catswords.net
