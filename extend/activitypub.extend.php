@@ -370,6 +370,8 @@ function activitypub_http_get($url, $access_token = '') {
         "Date" => activitypub_build_date('now'),
         "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\""
     );
+
+    // set access token
     if (!empty($access_token)) {
         $headers["Authorization"] = "Bearer " . $access_token;
     }
@@ -416,15 +418,18 @@ function activitypub_http_post($url, $raw_data, $access_token = '', $mb = null) 
     $headers = array(
         "Date" => $date,
         "Digest" => $digest,
-        "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
+        "Content-Type" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
     );
-    if (!empty($access_token)) {
-        $headers["Authorization"] = "Bearer " . $access_token;
-    }
     list($private_key, $public_key) = activitypub_get_stored_keypair($mb);
 
     // build the signature
     $signature = activitypub_build_signature($url, $date, $digest, $private_key, $mb, "POST");
+    $headers["Signature"] = $signature;
+
+    // set access token
+    if (!empty($access_token)) {
+        $headers["Authorization"] = "Bearer " . $access_token;
+    }
 
     // request
     $ch = curl_init();
