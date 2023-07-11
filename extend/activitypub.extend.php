@@ -584,17 +584,29 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
                 $account = substr($term_ctx['value'], 1);
                 $account_terms = explode('@', $account);
                 $account_ctx = array("username" => $account_terms[0], "host" => $account_terms[1]);
+                $webfigner_ctx = array("subject" => "");
                 if (!empty($account_ctx['host'])) {
-                    // 공통 WebFinger에 연결
-                    $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_DEFAULT_SCHEME . "://" . $account_ctx['host'] . "/.well-known/webfinger?resource=acct:" . $account);
+                    $counter = 2;    // WebFinger에 연결하는 경우의 수 정의 (=N-1)
+                    while ($counter > -1 && $webfigner_ctx['subject'] != ("acct:" . $account)) {
+                        switch($counter) {
+                            case 0:    // 공통 WebFinger에 연결
+                                $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_DEFAULT_SCHEME . "://" . $account_ctx['host'] . "/.well-known/webfinger?resource=acct:" . $account);
+                                break;
+                            case 1:    // 실패시, 그누보드5용 WebFinger에 연결
+                                $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_DEFAULT_SCHEME . "://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
+                                break;
+                            case 2:    // 실패시, 그누보드5용 WebFinger에 연결 + 보안통신 해제
+                                $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_INSECURE_SCHEME . "://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
+                                break;
+                            default:
+                                $counter = -1;
+                        }
 
-                    // 실패시, 그누5 전용 WebFinger에 연결
-                    if ($webfigner_ctx['subject'] != ("acct:" . $account)) {
-                        $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_INSECURE_SCHEME . "://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
+                        $counter--;   // 시도 횟수 차감
                     }
 
-                    // 한번 더 확인
-                    if ($webfigner_ctx['subject'] != ("acct:" . $account)) break;
+                    // WebFinger 정보 수신을 못한 경우 아무 작업도 하지 않음
+                    if ($counter < 0) break;
 
                     // 받은 요청으로 처리
                     $webfigner_links = $webfigner_ctx['links'];
