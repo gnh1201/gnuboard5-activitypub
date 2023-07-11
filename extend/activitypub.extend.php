@@ -330,13 +330,22 @@ function activitypub_build_http_headers($headers) {
 }
 
 function activitypub_http_get($url, $access_token = '') {
-    // write a HTTP header
-    $headers = array("Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
+    // make the time string
+    $tz = new DateTimeZone('GMT');
+    $dt = new DateTime('now', $tz);
+    $now = $dt->format('d M Y H:i:s e');    // e.g. 18 Dec 2019 10:08:46 GMT
+
+    // build the header
+    $headers = array(
+        "Date" => $now,
+        "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\""
+    );
     if (!empty($access_token)) {
         $headers["Authorization"] = "Bearer " . $access_token;
     }
+    // Todo: Add Signature header
 
-    // do HTTP request
+    // request
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
