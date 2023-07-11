@@ -342,7 +342,10 @@ function activitypub_build_digest($body) {
     return $digest;
 }
 
-function activitypub_build_signature($url, $date, $digest, $private_key, $mb = null, $method="POST") {
+function activitypub_build_signature($url, $date, $digest, $mb, $method="POST") {
+    // get a certificate
+    list($private_key, $public_key) = activitypub_get_stored_keypair($mb);
+    
     // get host and path from URL
     list($host, $path) = array(parse_url($url, PHP_URL_HOST), parse_url($url, PHP_URL_PATH));
 
@@ -409,7 +412,7 @@ function activitypub_get_attachments($bo_table, $wr_id) {
     return $attachments;
 }
 
-function activitypub_http_post($url, $raw_data, $access_token = '', $mb = null) {
+function activitypub_http_post($url, $raw_data, $mb, $access_token = '') {
     // get digest
     $date = activitypub_build_date('now');
     $digest = activitypub_build_digest($raw_data);
@@ -420,10 +423,9 @@ function activitypub_http_post($url, $raw_data, $access_token = '', $mb = null) 
         "Digest" => $digest,
         "Content-Type" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
     );
-    list($private_key, $public_key) = activitypub_get_stored_keypair($mb);
 
     // build the signature
-    $signature = activitypub_build_signature($url, $date, $digest, $private_key, $mb, "POST");
+    $signature = activitypub_build_signature($url, $date, $digest, $mb, "POST");
     $headers["Signature"] = $signature;
 
     // set access token
@@ -734,7 +736,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
         }
 
         // inbox로 데이터 전송
-        $response = activitypub_http_post($remote_inbox_url, $rawdata, $access_token, $mb);
+        $response = activitypub_http_post($remote_inbox_url, $rawdata, $mb, $access_token);
     }
 
     // 발행됨(Published)으로 상태 업데이트
