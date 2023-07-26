@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <abuse@catswords.net>
 // MIT License
-// 2023-04-18 (version 0.1.14-dev)
+// 2023-07-26 (version 0.1.15)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
