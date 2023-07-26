@@ -215,7 +215,13 @@ function activitypub_get_icon($mb) {
         $icon_file_url = "https://www.gravatar.com/avatar/" . md5($mb['mb_email']);
     }
 
-    return $icon_file_url;
+    $icon_ctx = array(
+        "type" => "Image",
+        "mediaType" => "image/png",
+        "url" => $icon_file_url
+    );
+
+    return $icon_ctx;
 }
 
 function activitypub_get_user_interactions() {
@@ -329,10 +335,11 @@ function activitypub_build_http_headers($headers) {
     return $lines;
 }
 
-function activitypub_build_date($dateString='now') {
+function activitypub_build_datetime($s='now') {
     // e.g. 18 Dec 2019 10:08:46 GMT
-    $dt = ($dateString == "now" ? new DateTime('now', new DateTimeZone('GMT')) : DateTime::createFromFormat('d M Y H:i:s e', $dateString));
-    return $dt->format('d M Y H:i:s e');
+	$format = "d M Y H:i:s e";
+    $dt = ($s == "now" ? new DateTime('now', new DateTimeZone("GMT")) : DateTime::createFromFormat($format, $s));
+    return $dt->format($format);
 }
 
 function activitypub_build_digest($body) {
@@ -370,7 +377,7 @@ function activitypub_build_signature($url, $date, $digest, $mb, $method="POST") 
 function activitypub_http_get($url, $access_token = '') {
     // build the header
     $headers = array(
-        "Date" => activitypub_build_date('now'),
+        "Date" => activitypub_build_datetime('now'),
         "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\""
     );
 
@@ -414,7 +421,7 @@ function activitypub_get_attachments($bo_table, $wr_id) {
 
 function activitypub_http_post($url, $raw_data, $mb, $access_token = '') {
     // get digest
-    $date = activitypub_build_date('now');
+    $date = activitypub_build_datetime('now');
     $digest = activitypub_build_digest($raw_data);
     
     // build the headers
@@ -995,7 +1002,7 @@ function activitypub_build_collection($items, $summary = '') {
 
 class _GNUBOARD_ActivityPub {
     public static function open() {
-        header("Content-Type: application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
+        header("Content-Type: application/activity+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
     }
 
     public static function webfinger() {
@@ -1091,17 +1098,15 @@ class _GNUBOARD_ActivityPub {
             "@context" => array(NAMESPACE_ACTIVITYSTREAMS, NAMESPACE_W3ID_SECURITY_V1, array("@language" => "ko")),
             "type" => "Person",
             "id" => $activitypub_user_id,
-            "name" => $mb['mb_name'],
-            "preferredUsername" => $mb['mb_nick'],
+            "name" => $mb['mb_nick'],   // display name
+            "preferredUsername" => $mb['mb_id'],    // real ID
             "summary" => $mb['mb_profile'],
             "inbox" => activitypub_get_url("inbox", array("mb_id" => $mb['mb_id'])),
             "outbox" => activitypub_get_url("outbox", array("mb_id" => $mb['mb_id'])),
             "followers" => activitypub_get_url("followers", array("mb_id" => $mb['mb_id'])),
             "following" => activitypub_get_url("following", array("mb_id" => $mb['mb_id'])),
             "liked" => activitypub_get_url("liked", array("mb_id" => $mb['mb_id'])),
-            "icon" => array(
-                activitypub_get_icon($mb)
-            ),
+            "icon" => activitypub_get_icon($mb),
             "endpoints" => array(
                 "sharedInbox" => activitypub_get_url("inbox")
             ),
@@ -1109,7 +1114,9 @@ class _GNUBOARD_ActivityPub {
                 "id" => $activitypub_user_id . "#main-key",
                 "owner" => $activitypub_user_id,
                 "publicKeyPem" => $public_key
-            )
+            ),
+            "summary" => strip_tags($mb['mb_signature']),
+            "discoverable" => true,
         );
 
         return activitypub_json_encode($context);
