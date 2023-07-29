@@ -1,5 +1,5 @@
 # gnuboard5-activitypub
-ActivityPub implementation for GNUBOARD 5
+ActivityPub implementation for GNUBOARD 5 https://sir.kr/g5_plugin/10381
 
 ## 사용 전 설정
   * `apstreams` 게시판 추가
