@@ -4,7 +4,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub implementation for GNUBOARD 5
 // Go Namhyeon <abuse@catswords.net>
 // MIT License
-// 2023-07-26 (version 0.1.15)
+// 2023-08-06 (version 0.1.16)
 
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -68,6 +68,17 @@ function activitypub_load_library($name, $callback) {
         "files" => $_[$name],
         "data" => call_user_func($callback)
     ));
+}
+
+// ActivityPub 표준 문서에서는 단수형, 실제 어플리케이션에선 복수형으로 표현되는 것을 모두 대응함
+function activitypub_cast_to_array($s) {
+    $d = array();
+    if (is_array($s)) {
+        $d = $s;
+    } else if (isset($s)) {
+        $d[] = $s;
+    }
+    return $d;
 }
 
 function activitypub_create_keypair() {
@@ -161,8 +172,8 @@ function activitypub_json_encode($arr) {
     return json_encode($arr);
 }
 
-function activitypub_json_decode($arr) {
-    return json_decode($arr, true);
+function activitypub_json_decode($str) {
+    return json_decode($str, true);
 }
 
 function activitypub_parse_stored_data($s) {
@@ -337,7 +348,7 @@ function activitypub_build_http_headers($headers) {
 
 function activitypub_build_datetime($s='now') {
     // e.g. 18 Dec 2019 10:08:46 GMT
-	$format = "d M Y H:i:s e";
+    $format = "d M Y H:i:s e";
     $dt = ($s == "now" ? new DateTime('now', new DateTimeZone("GMT")) : DateTime::createFromFormat($format, $s));
     return $dt->format($format);
 }
@@ -820,9 +831,9 @@ function activitypub_update_activity($inbox = "inbox", $data, $mb = array("mb_id
         $wr_num = get_next_num($write_table);
         $wr_reply = '';
         $ca_name = $inbox;    // Inbox/Outbox
-        $wr_subject = mb_substr($content, 0, 50);
-        $wr_seo_title = $content;
-        $wr_content = $content . "\r\n\r\n[외부에서 전송된 글입니다.]";
+        $wr_subject = mb_substr(strip_tags($content), 0, 50);
+        $wr_seo_title = strip_tags($content);
+        $wr_content = strip_tags($content) . "\r\n\r\n[외부에서 전송된 글입니다.]";
         $wr_link1 = $data['actor'];
         $wr_link2 = '';
         $wr_homepage = $data['actor'];
@@ -1130,14 +1141,14 @@ class _GNUBOARD_ActivityPub {
                 // 공개(Public) 설정한 메시지는 ACTIVITYPUB_G5_TABLENAME에 저장
                 $data = activitypub_json_decode(file_get_contents("php://input"), true);
 
-                if (empty($data['@context'])) {
-                    return activitypub_json_encode(array("message" => "This is a broken context"));
-                }
-                
-                if ($data['@context'] != NAMESPACE_ACTIVITYSTREAMS) {
+                // @context의 네임스페이스는 단수형(string으로 표현) 또는 복수형(array로 표현)될 수 있음
+                $namespaces = activitypub_cast_to_array($data['@context']);
+
+                // ActivityStream 네임스페이스가 존재하지 않는 경우 요청 거절
+                if (!in_array(NAMESPACE_ACTIVITYSTREAMS, $namespaces)) {
                     return activitypub_json_encode(array("message" => "This is not an ActivityStreams request"));
                 }
-                
+
                 // 컨텐츠 변수 정의
                 $content = '';
 
@@ -1146,8 +1157,11 @@ class _GNUBOARD_ActivityPub {
                     // 정보 불러오기 
                     $mb = get_member(ACTIVITYPUB_G5_USERNAME);
 
-                    // 수신자 확인
-                    $to = $data['to'];
+                    // 수신자 (참조자 포함) 확인
+                    $to = array_merge(
+                        activitypub_cast_to_array($data['to']),
+                        activitypub_cast_to_array($data['cc'])
+                    );
 
                     // 원글 정보 확인
                     $object = $data['object'];
@@ -1168,7 +1182,12 @@ class _GNUBOARD_ActivityPub {
 
                             // 컨텐츠 설정
                             $bo = get_board_db(ACTIVITYPUB_G5_BOARDNAME, true);
-                            $content = sprintf("%s\r\n\r\n[외부에서 전송된 글입니다. 자세한 내용은 %s#%s 글을 확인하세요.]", $object['content'], $bo['bo_subject'], $activity_wr_id);
+                            $content = sprintf(
+                                "%s\r\n\r\n[외부에서 전송된 글입니다. 자세한 내용은 %s#%s 글을 확인하세요.]",
+                                strip_tags($object['content']),
+                                $bo['bo_subject'],
+                                $activity_wr_id
+                            );
 
                             // 답글인지 확인
                             if (!empty($object['inReplyTo'])) {
@@ -1656,3 +1675,4 @@ switch ($route) {
         _GNUBOARD_ActivityPub::close();
         break;
 }
+
