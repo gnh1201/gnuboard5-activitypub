@@ -2,7 +2,7 @@
 if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 
 // Description: ActivityPub implementation for GNUBOARD 5
-// Author: Go Namhyeon <abuse@catswords.net>
+// Author: Go Namhyeon (Catswords Research) <abuse@catswords.net>
 // ActivityPub: @gnh1201@catswords.social
 // License: MIT
 // Date: 2023-08-06
