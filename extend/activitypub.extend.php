@@ -5,8 +5,8 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // Author: Go Namhyeon (Catswords Research) <abuse@catswords.net>
 // ActivityPub: @gnh1201@catswords.social
 // License: MIT
-// Date: 2023-08-06
-// Version: 0.1.17-dev
+// Date: 2023-08-08
+// Version: 0.1.17
 // References:
 //   * https://www.w3.org/TR/activitypub/
 //   * https://www.w3.org/TR/activitystreams-core/
@@ -19,6 +19,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://github.com/autogestion/pubgate-telegram
 //   * https://blog.joinmastodon.org/2018/06/how-to-implement-a-basic-activitypub-server/
 //   * https://chat.openai.com/share/4fda7974-cc0b-439a-b0f2-dc828f8acfef
+//   * https://codeberg.org/mro/activitypub/src/commit/4b1319d5363f4a836f23c784ef780b81bc674013/like.sh#L101
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.14-dev");
@@ -350,7 +351,7 @@ function activitypub_build_http_headers($headers) {
 
 function activitypub_build_datetime($s='now') {
     // e.g. 18 Dec 2019 10:08:46 GMT
-    $format = "d M Y H:i:s e";
+    $format = "D, d M Y H:i:s e";
     $dt = ($s == "now" ? new DateTime('now', new DateTimeZone("GMT")) : DateTime::createFromFormat($format, $s));
     return $dt->format($format);
 }
@@ -362,7 +363,7 @@ function activitypub_build_digest($body) {
     return $digest;
 }
 
-function activitypub_build_signature($url, $date, $digest, $mb, $method="POST") {
+function activitypub_build_signature($url, $date, $digest, $mb, $method="post") {
     // get a certificate
     list($private_key, $public_key) = activitypub_get_stored_keypair($mb);
     
@@ -374,13 +375,24 @@ function activitypub_build_signature($url, $date, $digest, $mb, $method="POST") 
     $keyId = $activitypub_user_id . "#main-key";
 
     // build a target data to get signature
+    /*
     $signature = $method . ' ' . $path . "\n" .
         'HOST: ' . $host . "\n" .
         'Date: ' . $date . "\n" .
         'Digest: ' . $digest;
+    */
+    // Ref: https://codeberg.org/mro/activitypub/src/commit/4b1319d5363f4a836f23c784ef780b81bc674013/like.sh#L101
+    $signature = sprintf(
+        "%s: %s\n%s: %s\n%s: %s\n%s: %s",
+        "(request-target)",
+        "{$method} {$path}",
+        "host", $host,
+        "date", $date,
+        "digest", $digest
+    );
 
     // create a signature
-    openssl_sign($signature, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+    openssl_sign($signature, $signature, $private_key, OPENSSL_ALGO_SHA256);
     $signature = base64_encode($signature);
 
     // create a signature header
@@ -391,7 +403,7 @@ function activitypub_http_get($url, $access_token = '') {
     // build the header
     $headers = array(
         "Date" => activitypub_build_datetime('now'),
-        "Accept" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\""
+        "Accept" => "application/activity+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\""
     );
 
     // set access token
@@ -432,20 +444,20 @@ function activitypub_get_attachments($bo_table, $wr_id) {
     return $attachments;
 }
 
-function activitypub_http_post($url, $raw_data, $mb, $access_token = '') {
+function activitypub_http_post($url, $rawdata, $mb, $access_token = '') {
     // get digest
     $date = activitypub_build_datetime('now');
-    $digest = activitypub_build_digest($raw_data);
-    
+    $digest = activitypub_build_digest($rawdata);
+
     // build the headers
     $headers = array(
         "Date" => $date,
         "Digest" => $digest,
-        "Content-Type" => "application/ld+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
+        "Accept" => "application/activity+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
     );
 
     // build the signature
-    $signature = activitypub_build_signature($url, $date, $digest, $mb, "POST");
+    $signature = activitypub_build_signature($url, $date, $digest, $mb);
     $headers["Signature"] = $signature;
 
     // set access token
@@ -461,11 +473,17 @@ function activitypub_http_post($url, $raw_data, $mb, $access_token = '') {
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POSTFIELDS => $raw_data,
+        CURLOPT_POSTFIELDS => $rawdata,
         CURLOPT_POST => true
     ));
     $response = curl_exec($ch);
+    $errno = curl_errno($ch);
     curl_close($ch);
+
+    // 전송 오류가 있었을 시 쪽지로 알림
+    if ($errno) {
+        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[경고] 메시지 전송 중 오류가 발생함. 오류 번호: " . $errno);
+    }
 
     return activitypub_json_decode($response, true);
 }
@@ -650,6 +668,9 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
 
     // 수신자/내용 생성
     $to = array_merge(activitypub_cast_to_array(NAMESPACE_ACTIVITYSTREAMS_PUBLIC), $_added_to);
+    $cc = array();  // 참조자
+    $tag = array();  // 태그
+    $endpoints = array();
     $content = "";
     foreach($terms as $term_ctx) {
         switch ($term_ctx['type']) {
@@ -681,7 +702,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
 
                     // WebFinger 정보 수신을 못한 경우, 쪽지로 알리고 아무 작업도 하지 않음
                     if (empty($webfigner_ctx['subject'])) {
-                        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[발송실패] 수신자를 찾을 수 없음: " . $account);
+                        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[발송실패] 수신자를 찾을 수 없음: @" . $account);
                         break;
                     }
 
@@ -689,7 +710,14 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
                     $webfigner_links = $webfigner_ctx['links'];
                     foreach($webfigner_links as $link) {
                         if ($link['rel'] == "self" && $link['type'] == "application/activity+json") {
-                            array_push($to, $link['href']);  // 수신자에 반영
+                            // 태그 목록에 추가
+                            array_push($tag, array(
+                                "type" => "Mention",
+                                "href" => $link['href'],
+                                "name" => '@' . $account
+                            ));
+                            array_push($cc, $link['href']);  // 참조자 목록에 추가
+                            array_push($endpoints, $link['href']);  // 글을 전송할 엔드포인트(URL)에 반영
                         }
                     }
                 }
@@ -703,10 +731,16 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
 
     // 위치정보가 활성화되어 있으면
     if (ACTIVITYPUB_ENABLED_GEOLOCATION) {
-        $object = array_merge($_added_object, array(
+        $_added_object = array_merge($_added_object, array(
             "location" => $location_ctx
         ));
     }
+
+    // 참조자, 태그 추가
+    $_added_object = array_merge($_added_object, array(
+        "cc" => $cc,
+        "tag" => $tag
+    ));
 
     // 전문 생성
     $object = activitypub_build_note($content, $object_id, $mb, $_added_object);
@@ -728,23 +762,20 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
     // 보낼 전문을 인코딩
     $rawdata = activitypub_json_encode($data);
 
-    // 수신자 작업
-    foreach($to as $_to) {
-        // 공개 네임스페이스인 경우 건너뛰기
-        if ($_to == NAMESPACE_ACTIVITYSTREAMS_PUBLIC) continue;
-
+    // 수신자 엔드포인트(URL) 작업
+    foreach($endpoints as $endpoint) {
         // 수신자 정보 조회
-        $remote_user_ctx = activitypub_http_get($_to);
+        $remote_account_ctx = activitypub_http_get($endpoint);
 
         // inbox 주소 찾기
-        $remote_inbox_url = $remote_user_ctx['inbox'];
+        $remote_inbox_url = $remote_account_ctx['inbox'];
         if (empty($remote_inbox_url)) {
-            $remote_inbox_url = $remote_user_ctx['endpoints']['sharedInbox'];
+            $remote_inbox_url = $remote_account_ctx['endpoints']['sharedInbox'];
         }
 
         // inbox 주소가 없으면 건너뛰기
         if (empty($remote_inbox_url)) {
-            activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "Could not find the inbox of " . $_to);
+            activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "이 사용자 또는 서버는 메시지를 수신할 수 없는 상태임: " . $_to);
             continue;
         }
 
@@ -759,7 +790,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
         }
 
         // inbox로 데이터 전송
-        $response = activitypub_http_post($remote_inbox_url, $rawdata, $mb, $access_token);
+        activitypub_http_post($remote_inbox_url, $rawdata, $mb, $access_token);
     }
 
     // 발행됨(Published)으로 상태 업데이트
@@ -1674,7 +1705,7 @@ switch ($route) {
         _GNUBOARD_ActivityPub::close();
         break;
         
-    case "oauth2.authorize":  // TODO
+    case "oauth2.authorize":  // To be implement
         _GNUBOARD_ActivityPub::open();
         echo _GNUBOARD_ActivityPub::authorize();
         _GNUBOARD_ActivityPub::close();
