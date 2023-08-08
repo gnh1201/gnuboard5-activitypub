@@ -6,7 +6,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub: @gnh1201@catswords.social
 // License: MIT
 // Date: 2023-08-08
-// Version: 0.1.18-dev
+// Version: 0.1.18
 // References:
 //   * https://www.w3.org/TR/activitypub/
 //   * https://www.w3.org/TR/activitystreams-core/
@@ -20,6 +20,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://blog.joinmastodon.org/2018/06/how-to-implement-a-basic-activitypub-server/
 //   * https://chat.openai.com/share/4fda7974-cc0b-439a-b0f2-dc828f8acfef
 //   * https://codeberg.org/mro/activitypub/src/commit/4b1319d5363f4a836f23c784ef780b81bc674013/like.sh#L101
+//   * https://socialhub.activitypub.rocks/t/problems-posting-to-mastodon-inbox/801/10
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.18-dev");
@@ -580,6 +581,9 @@ function koreaexim_get_exchange_data() {
 }
 
 function activitypub_publish_content($content, $object_id, $mb, $_added_object = array(), $_added_to = array()) {
+    // 액티비티 관리용 계정의 글 전송 차단
+    if ($mb['mb_id'] == ACTIVITYPUB_G5_USERNAME) return;
+
     // 위치정보를 사용하는 경우 모듈 로드
     $location_ctx = array();
     if (ACTIVITYPUB_ENABLED_GEOLOCATION) {
@@ -811,12 +815,13 @@ function activitypub_parse_content($content) {
     $pos = -1;
     $get_next_position = function ($pos) use ($content) {
         try {
-            return min(array_filter(array(
+            $positions = array_filter(array(
                 strpos($content, '@', $pos + 1),
                 strpos($content, '#', $pos + 1),
                 strpos($content, 'http://', $pos + 1),
                 strpos($content, 'https://', $pos + 1)
-            ), "is_numeric"));
+            ), "is_numeric");
+            return (count($positions) > 0 ? min($positions) : false);
         } catch (ValueError $e) {
             return false;
         }
@@ -1507,7 +1512,7 @@ function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redi
     // 'apstreams' 계정이 있는지 확인
     if (!in_array(ACTIVITYPUB_G5_USERNAME, $member_list['id'])) return;
 
-    // 현재 로그인되어 있으면, 로그인된 계정의 정보를 따름
+    // 글을 생성한 회원 정보
     $mb = (isset($member['mb_id']) ? $member : get_member(ACTIVITYPUB_G5_USERNAME));
 
     // 글 전송하기
@@ -1524,12 +1529,12 @@ function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redi
 function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_url) {
     global $g5, $member;
 
-    // 본문 가져오기
+    // 본문 가져오기 (본문이 없는 경우 중단)
     $sql = "select wr_id, wr_content from {$g5['write_prefix']}{$board['bo_table']} where wr_id = '{$wr_id}'";
     $row = sql_fetch($sql);
     if (empty($row['wr_id'])) return;
-    
-    // 현재 로그인되어 있으면, 로그인된 계정의 정보를 따름
+
+    // 글을 생성한 회원 정보
     $mb = (isset($member['mb_id']) ? $member : get_member(ACTIVITYPUB_G5_USERNAME));
 
     // 추가할 오브젝트 속성
@@ -1555,12 +1560,12 @@ function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_ur
 function _activitypub_comment_update_after($board, $wr_id, $w, $qstr, $redirect_url, $comment_id, $reply_array) {
     global $g5, $member;
 
-    // 본문(댓글) 가져오기
+    // 본문(댓글) 가져오기 (본문이 없는 경우 중단)
     $sql = "select wr_id, wr_content from {$g5['write_prefix']}{$board['bo_table']} where wr_id = '{$wr_id}'";
     $row = sql_fetch($sql);
     if (empty($row['wr_id'])) return;
-    
-    // 현재 로그인되어 있으면, 로그인된 계정의 정보를 따름
+
+    // 글을 생성한 회원 정보
     $mb = (isset($member['mb_id']) ? $member : get_member(ACTIVITYPUB_G5_USERNAME));
 
     // 추가할 오브젝트 속성
@@ -1576,7 +1581,7 @@ function _activitypub_comment_update_after($board, $wr_id, $w, $qstr, $redirect_
 
     // 글 전송하기
     if (!empty($mb['mb_id'])) {
-        $data = activitypub_publish_content(
+        activitypub_publish_content(
             $row['wr_content'],
             G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_parent']}&c_id=" . $comment_id,
             $mb,
@@ -1670,3 +1675,4 @@ switch ($route) {
         _GNUBOARD_ActivityPub::close();
         break;
 }
+
