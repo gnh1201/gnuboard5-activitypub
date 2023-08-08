@@ -7,7 +7,6 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // License: MIT
 // Date: 2023-08-06
 // Version: 0.1.17-dev
-
 // References:
 //   * https://www.w3.org/TR/activitypub/
 //   * https://www.w3.org/TR/activitystreams-core/
@@ -19,6 +18,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://github.com/broidHQ/integrations/tree/master/broid-schemas#readme
 //   * https://github.com/autogestion/pubgate-telegram
 //   * https://blog.joinmastodon.org/2018/06/how-to-implement-a-basic-activitypub-server/
+//   * https://chat.openai.com/share/4fda7974-cc0b-439a-b0f2-dc828f8acfef
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.14-dev");
