@@ -6,7 +6,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub: @gnh1201@catswords.social
 // License: MIT
 // Date: 2023-08-08
-// Version: 0.1.17
+// Version: 0.1.18-dev
 // References:
 //   * https://www.w3.org/TR/activitypub/
 //   * https://www.w3.org/TR/activitystreams-core/
@@ -22,7 +22,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://codeberg.org/mro/activitypub/src/commit/4b1319d5363f4a836f23c784ef780b81bc674013/like.sh#L101
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
-define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.14-dev");
+define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.18-dev");
 define("ACTIVITYPUB_DEFAULT_SCHEME", "https");    // 외부 통신용 스킴 (SSL 사용이 기본)
 define("ACTIVITYPUB_INSECURE_SCHEME", "http");    // 그누보드5 ActivityPub 통신용 스킴 (SSL 사용을 하지 않을 수도 있음을 고려)
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
@@ -453,7 +453,7 @@ function activitypub_http_post($url, $rawdata, $mb, $access_token = '') {
     $headers = array(
         "Date" => $date,
         "Digest" => $digest,
-        "Accept" => "application/activity+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
+        "Content-Type" => "application/activity+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"",
     );
 
     // build the signature
@@ -736,9 +736,8 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
         ));
     }
 
-    // 참조자, 태그 추가
+    // 태그 추가
     $_added_object = array_merge($_added_object, array(
-        "cc" => $cc,
         "tag" => $tag
     ));
 
@@ -751,13 +750,20 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
         "type" => "Create",
         "id" => G5_BBS_URL . "/board.php?bo_table=" . ACTIVITYPUB_G5_BOARDNAME . "#Draft",
         "to" => $to,
+        "cc" => $cc,
         "actor" => $object['attributedTo'],
         "object" => $object
     );
 
     // 초안(Draft) 작성
-    $activity_wr_id = activitypub_update_activity("outbox", $data, $mb, "draft");
-    $data['id'] = G5_BBS_URL . "/board.php?bo_table=" . ACTIVITYPUB_G5_BOARDNAME . "&wr_id=" . $activity_wr_id;
+    $activity_id = activitypub_update_activity("outbox", $data, $mb, "draft");
+    $data['object']['id'] = G5_BBS_URL . "/board.php?bo_table=" . ACTIVITYPUB_G5_BOARDNAME . "&wr_id=" . $activity_id;
+    $data['id'] = activitypub_get_url("activity", array("id" => $activity_id));
+
+    // 현재 시간 반영
+    $now_utc_tz = str_replace('+00:00', 'Z', gmdate('c'));
+    $data['published'] = $now_utc_tz;
+    $data['updated'] = $now_utc_tz;
 
     // 보낼 전문을 인코딩
     $rawdata = activitypub_json_encode($data);
@@ -940,8 +946,8 @@ function activitypub_update_activity($inbox = "inbox", $data, $mb = array("mb_id
     if ($status == "published") {
         // 저장 전 데이터 처리
         $now_utc_tz = str_replace('+00:00', 'Z', gmdate('c'));
-        $data['published'] = $now_utc_tz;
-        $data['updated'] = $now_utc_tz;
+        $data['published'] = empty($data['published']) ? $now_utc_tz : $data['published'];
+        $data['updated'] = empty($data['updated']) ? $now_utc_tz : $data['updated'];
 
         // 요청 전문은 파일로 저장
         $raw_context = activitypub_json_encode($data);
@@ -983,43 +989,30 @@ function activitypub_update_activity($inbox = "inbox", $data, $mb = array("mb_id
     return $wr_id;
 }
 
-function activitypub_get_objects($mb, $inbox = "inbox") {
+function activitypub_get_activity_by_id($activity_id) {
     global $g5;
 
-    $items = array();
+    // 액티비티 전문
+    $activity_ctx = array();
 
-    // 정보 불러오기
-    $sql = "";
-    if(!$mb['mb_id']) {
-        $sql = "select wr_id from " . ACTIVITYPUB_G5_TABLENAME . "
-            where ca_name = '$inbox'
-                and DATE(wr_datetime) BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_OUTDATED_DAYS . " DAY AND CURDATE()
-        ";
-    } else {
-        $sql = "select wr_id from " . ACTIVITYPUB_G5_TABLENAME . "
-            where ca_name = '$inbox'
-                and FIND_IN_SET('$mb_id', wr_7) > 0
-                and DATE(wr_datetime) BETWEEN CURDATE() - INTERVAL " . ACTIVITYPUB_G5_OUTDATED_DAYS . " DAY AND CURDATE()
-        ";
-    }
+    // 해당 액티비티 찾고 없으면 빈 정보 반환
+    $write_table = $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME;
+    $wr = get_write($write_table, $activity_id);
+    if (empty($wr['wr_id'])) return $activity_ctx;
+
+    // 액티비티 조회
+    $sql = "select * from {$g5['board_file_table']}
+        where bo_table = '" . ACTIVITYPUB_G5_BOARDNAME . "' and wr_id = '{$wr['wr_id']}' and bf_content = 'application/activity+json'";
     $result = sql_query($sql);
-
-    // 정보 조회 후 처리
     while ($row = sql_fetch_array($result)) {
-        $sql2 = "select * from {$g5['board_file_table']}
-            where bo_table = '" . ACTIVITYPUB_G5_BOARDNAME . "' and wr_id = '{$row['wr_id']}' and bf_content = 'application/activity+json'";
-        $result2 = sql_query($sql2);
-        while ($row2 = sql_fetch_array($result2)) {
-            $filename = $row2['bf_file'];
-            $filepath = G5_DATA_PATH . "/file/" . ACTIVITYPUB_G5_BOARDNAME . "/" . $filename;
-            if(file_exists($filepath)) {
-                array_push($items, activitypub_json_decode(file_get_contents($filepath))['object']);
-            }
+        $filename = $row['bf_file'];
+        $filepath = G5_DATA_PATH . "/file/" . ACTIVITYPUB_G5_BOARDNAME . "/" . $filename;
+        if (file_exists($filepath)) {
+            $activity_ctx = activitypub_json_decode(@file_get_contents($filepath))['object'];
         }
     }
 
-    // 전문 만들기
-    return activitypub_build_collection($items);
+    return $activity_ctx;
 }
 
 // Object type: Note
@@ -1167,6 +1160,17 @@ class _GNUBOARD_ActivityPub {
         );
 
         return activitypub_json_encode($context);
+    }
+    
+    public static function activity() {
+        // HTTP 요청 유형에 따라 작업
+        switch ($_SERVER['REQUEST_METHOD']) {
+            case "POST":
+                return activitypub_json_encode(array("message" => "Disallowed method"));
+
+            case "GET":
+                return activitypub_get_activity_by_id($_GET['id']);
+        }
     }
 
     public static function inbox() {
@@ -1412,8 +1416,7 @@ class _GNUBOARD_ActivityPub {
                 return activitypub_json_encode(array("message" => "Success"));
 
             case "GET":
-                $mb = get_member($_GET['mb_id']);
-                return activitypub_json_encode(activitypub_get_objects($mb, "inbox"));
+                return activitypub_json_encode(array("message" => "Disallowed method"));
 
             default:
                 return activitypub_json_encode(array("message" => "Not supported method"));
@@ -1455,56 +1458,6 @@ class _GNUBOARD_ActivityPub {
 
         $items = array();  // 항목을 담을 배열
 
-        /* // TODO: Remove (Security Reason)
-        // 게시판인 경우
-        if (array_key_exists("bo_table", $_GET)) {
-            $bo = get_board_db($_GET['bo_table'], true);
-
-            if (!empty($bo['bo_table'])) {
-                switch($bo['bo_table']) {
-                    case ACTIVITYPUB_G5_BOARDNAME:
-                        return self::inbox();   // 액티비티를 저장하는 테이블인 경우 inbox와 동일하게 취급
-
-                    default:
-                        
-
-                        // 조회할 페이지 수 불러오기
-                        $page = intval($_GET['page']);
-                        if ($page < 1) {
-                            $page = 1;
-                        }
-
-                        // 페이지 당 표시할 게시물 수 불러오기
-                        $page_rows = 0;
-                        if (!empty($bo['bo_mobile_page_rows'])) {
-                            $page_rows = intval($bo['bo_mobile_page_rows']);
-                        } else if (!empty($bo['bo_page_rows'])) {
-                            $page_rows = intval($bo['bo_page_rows']);
-                        }
-
-                        // 페이지 당 표시할 게시물 수가 1보다 작으면 기본값(15)로 설정
-                        if ($pages_rows < 1) {
-                            $page_rows = 15;
-                        }
-
-                        // SQL 작성
-                        $write_table = $g5['write_prefix'] . $bo['bo_table'];
-                        $offset = ($page - 1) * $page_rows;
-                        $sql = "select wr_id, mb_id, wr_content, wr_datetime from {$write_table} where FIND_IN_SET('secret', wr_option) = 0 order by wr_datetime desc limit {$offset}, {$page_rows} ";
-
-                        // SQL 실행
-                        $result = sql_query($sql);
-                        while ($row = sql_fetch_array($result)) {
-                            $object_id = G5_BBS_URL . "/board.php?bo_table={$bo['bo_table']}&wr_id={$row['wr_id']}";
-                            $mb = get_member($row['mb_id']);
-                            $content = $row['wr_content'];
-                            array_push($items, activitypub_build_note($content, $object_id, $mb));
-                        }
-                }
-            }
-        }
-        */
-
         // 최근 활동에서 추출
         $sql = "select * from " . $g5['board_new_table']; 
         $result = sql_query($sql);
@@ -1529,15 +1482,15 @@ class _GNUBOARD_ActivityPub {
 
         switch ($grant_type) {
             case "authorization_code":
-                return activitypub_json_encode(array("message" => "Sorry. This grant type does not supported yet"));
+                return activitypub_json_encode(array("message" => "Not implemented"));
                 break;
 
             case "password":
-                return activitypub_json_encode(array("message" => "Sorry. This grant type does not supported yet"));
+                return activitypub_json_encode(array("message" => "Not implemented"));
                 break;
 
             case "client_credentials":
-                return activitypub_json_encode(array("message" => "Sorry. This grant type does not supported yet"));
+                return activitypub_json_encode(array("message" => "Not implemented"));
                 break;
         }
     }
@@ -1560,7 +1513,7 @@ function _activitypub_memo_form_update_after($member_list, $str_nick_list, $redi
     // 글 전송하기
     if (!empty($mb['mb_id'])) {
         // 글 전송하기
-        $data = activitypub_publish_content(
+        activitypub_publish_content(
             $me_memo,
             activitypub_get_url("user", array("mb_id" => $mb['mb_id'])),
             $mb
@@ -1590,7 +1543,7 @@ function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_ur
 
     // 글 전송하기
     if (!empty($mb['mb_id'])) {
-        $data = activitypub_publish_content(
+        activitypub_publish_content(
             $row['wr_content'],
             G5_BBS_URL . "/board.php?bo_table={$board['bo_table']}&wr_id={$row['wr_id']}",
             $mb,
@@ -1669,6 +1622,12 @@ switch ($route) {
         _GNUBOARD_ActivityPub::close();
         break;
 
+    case "activitypub.activity":
+        _GNUBOARD_ActivityPub::open();
+        echo _GNUBOARD_ActivityPub::activity();
+        _GNUBOARD_ActivityPub::close();
+        break;
+
     case "activitypub.inbox":
         _GNUBOARD_ActivityPub::open();
         echo _GNUBOARD_ActivityPub::inbox();
@@ -1705,7 +1664,7 @@ switch ($route) {
         _GNUBOARD_ActivityPub::close();
         break;
         
-    case "oauth2.authorize":  // To be implement
+    case "oauth2.authorize":  // Not implemented
         _GNUBOARD_ActivityPub::open();
         echo _GNUBOARD_ActivityPub::authorize();
         _GNUBOARD_ActivityPub::close();
