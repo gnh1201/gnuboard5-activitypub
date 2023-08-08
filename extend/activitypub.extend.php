@@ -23,7 +23,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://socialhub.activitypub.rocks/t/problems-posting-to-mastodon-inbox/801/10
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
-define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.18-dev");
+define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.18");
 define("ACTIVITYPUB_DEFAULT_SCHEME", "https");    // 외부 통신용 스킴 (SSL 사용이 기본)
 define("ACTIVITYPUB_INSECURE_SCHEME", "http");    // 그누보드5 ActivityPub 통신용 스킴 (SSL 사용을 하지 않을 수도 있음을 고려)
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
