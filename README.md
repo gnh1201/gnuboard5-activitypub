@@ -121,6 +121,9 @@ https://sir.kr/g5_plugin/10381
 * https://github.com/autogestion/pubgate-telegram
 * https://docs.joinmastodon.org/spec/security/
 * https://chat.openai.com/share/4fda7974-cc0b-439a-b0f2-dc828f8acfef
+* https://codeberg.org/mro/activitypub/src/commit/4b1319d5363f4a836f23c784ef780b81bc674013/like.sh#L101
+* https://socialhub.activitypub.rocks/t/problems-posting-to-mastodon-inbox/801/10
 
 ## 문의
 * abuse@catswords.net
+* ActivityPub [@gnh1201@catswords.social](https://catswords.social/@gnh1201)
