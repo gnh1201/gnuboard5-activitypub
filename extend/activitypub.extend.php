@@ -649,7 +649,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
     $terms = activitypub_parse_content($content);
 
     // 수신자/내용 생성
-    $to = array_merge(array(NAMESPACE_ACTIVITYSTREAMS_PUBLIC), $_added_to);
+    $to = array_merge(activitypub_cast_to_array(NAMESPACE_ACTIVITYSTREAMS_PUBLIC), $_added_to);
     $content = "";
     foreach($terms as $term_ctx) {
         switch ($term_ctx['type']) {
@@ -679,8 +679,11 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
                         $counter--;   // 시도 횟수 차감
                     }
 
-                    // WebFinger 정보 수신을 못한 경우 아무 작업도 하지 않음
-                    if ($counter < 0) break;
+                    // WebFinger 정보 수신을 못한 경우, 쪽지로 알리고 아무 작업도 하지 않음
+                    if (empty($webfigner_ctx['subject'])) {
+                        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[발송실패] 수신자를 찾을 수 없음: " . $account);
+                        break;
+                    }
 
                     // 받은 요청으로 처리
                     $webfigner_links = $webfigner_ctx['links'];
@@ -710,7 +713,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
 
     // 외부로 보낼 전문 생성
     $data = array(
-        "@context" => NAMESPACE_ACTIVITYSTREAMS,
+        "@context" => activitypub_cast_to_array(NAMESPACE_ACTIVITYSTREAMS),
         "type" => "Create",
         "id" => G5_BBS_URL . "/board.php?bo_table=" . ACTIVITYPUB_G5_BOARDNAME . "#Draft",
         "to" => $to,
@@ -1677,4 +1680,3 @@ switch ($route) {
         _GNUBOARD_ActivityPub::close();
         break;
 }
-
