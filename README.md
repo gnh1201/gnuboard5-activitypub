@@ -1,5 +1,5 @@
 # gnuboard5-activitypub
-ActivityPub implementation for GNUBOARD 5
+GNUBOARD5-ActivityPub: ActivityPub implementation for GNUBOARD5
 
 https://sir.kr/g5_plugin/10381
 
