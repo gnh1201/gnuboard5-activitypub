@@ -30,6 +30,8 @@ https://sir.kr/g5_plugin/10381
 - [x] 날씨 (openweathermap.org)
 - [x] 환율 (koreaexim.go.kr)
 
+## 그누보드5 만을 위한 기능 (아이디어)
+- [ ] 'ActivityPub 네트워크로 게시글 공유하기' 버튼
 
 ## 전문 예시
 
