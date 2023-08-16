@@ -19,8 +19,8 @@ https://sir.kr/g5_plugin/10381
 - [x] Geolocation (IP2Location, Naver Cloud)
 - [x] File attachment
 - [ ] File attachment - Automatically download a file to the local server
-- [x] Digest/Signature
-- [ ] Digest/Signature - Verification
+- [x] Digest/Signature - Request
+- [ ] Digest/Signature - Response
 - [x] w3id.org (e.g. the `publicKey` field of an actor)
 - [ ] OAuth 2.0
 - [ ] Message Queue Compatible (e.g. Redis, RebbitMQ, Kafka)
