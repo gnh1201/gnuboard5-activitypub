@@ -1,7 +1,8 @@
 # gnuboard5-activitypub
-GNUBOARD5-ActivityPub: ActivityPub implementation for GNUBOARD5
+GNUBOARD5-ActivityPub: ActivityPub implementation for GNUBOARD5 [Fediverse]
 
-https://sir.kr/g5_plugin/10381
+* https://sir.kr/g5_plugin/10381
+* https://codeberg.org/fediverse/delightful-activitypub-development
 
 ## 사용 전 설정
   * `apstreams` 게시판 추가
