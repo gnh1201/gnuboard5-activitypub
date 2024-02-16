@@ -16,12 +16,12 @@ GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 - [x] Followers
 - [x] Following
 - [x] Liked
-- [ ] Shares (개선 진행 중)
-- [x] Geolocation (IP2Location, Naver Cloud)
+- [ ] ~~Shares~~ (Altered to inbound/outbound)
+- [x] Geolocation
 - [x] File attachment
-- [ ] File attachment - Automatically download a file to the local server
+- [ ] File attachment - Automatically download a remote file to the local server
 - [x] Digest/Signature - Outbound
-- [ ] Digest/Signature - Inbound
+- [ ] ~~Digest/Signature - Inbound~~ (No required)
 - [x] w3id.org (e.g. the `publicKey` field of an actor)
 - [ ] OAuth 2.0
 - [ ] Message Queue Compatible (e.g. Redis, RebbitMQ, Kafka)
@@ -30,11 +30,10 @@ GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 - [x] 아바타 (gravatar.com)
 - [x] 날씨 (openweathermap.org)
 - [x] 환율 (koreaexim.go.kr)
+- [x] 국내 Geolocation (Naver Cloud)
+- [x] 국외 Geolocation (IP2Location)
 
-## 그누보드5 만을 위한 기능 (아이디어)
-- [ ] 'ActivityPub 네트워크로 게시글 공유하기' 버튼
-
-## 전문 예시
+## 전문(메시지) 예시
 
 ```json
 {
