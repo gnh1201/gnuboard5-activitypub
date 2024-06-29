@@ -3,12 +3,13 @@ GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 
 * https://sir.kr/g5_plugin/10381
 * https://codeberg.org/fediverse/delightful-activitypub-development
+* https://github.com/gnh1201/topic-activitypub
 
 ## 사용 전 설정
   * `apstreams` 게시판 추가
   * `apstreams` 사용자 추가
 
-## 지원현황
+## 지원기능
 - [x] WebFinger
 - [x] User
 - [x] Inbox
@@ -16,17 +17,17 @@ GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 - [x] Followers
 - [x] Following
 - [x] Liked
-- [ ] ~~Shares~~ (Altered to inbound/outbound)
+- [ ] ~~Shares~~ (inbox/outbox only)
 - [x] Geolocation
 - [x] File attachment
 - [ ] File attachment - Automatically download a remote file to the local server
 - [x] Digest/Signature - Outbound
 - [ ] ~~Digest/Signature - Inbound~~ (No required)
-- [x] w3id.org (e.g. the `publicKey` field of an actor)
+- [x] w3id.org (e.g., the `publicKey` field of an actor)
 - [ ] OAuth 2.0
-- [ ] Message Queue Compatible (e.g. Redis, RebbitMQ, Kafka)
+- [ ] Message Queue integration (e.g., Redis, RebbitMQ, Kafka)
 
-## 부가기능 (옵션)
+## 부가기능 (선택사항)
 - [x] 아바타 (gravatar.com)
 - [x] 날씨 (openweathermap.org)
 - [x] 환율 (koreaexim.go.kr)
@@ -111,7 +112,7 @@ GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 }
 ```
 
-## References
+## 참고자료
 * https://www.w3.org/TR/activitypub/
 * https://www.w3.org/TR/activitystreams-core/
 * https://www.w3.org/TR/activitystreams-vocabulary/
