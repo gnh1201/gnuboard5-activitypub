@@ -1,4 +1,6 @@
 # gnuboard5-activitypub
+[![Discord chat](https://img.shields.io/discord/359930650330923008?logo=discord)](https://discord.gg/dBE65JgcBW)
+
 GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 
 * https://sir.kr/g5_plugin/10381
