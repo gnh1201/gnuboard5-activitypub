@@ -11,11 +11,12 @@ require_once './admin.head.php';
 add_javascript(G5_POSTCODE_JS, 0);    //다음 주소 js
 ?>
 
-<div class="local_desc01 local_desc"><strong>액티비티 오라클</strong>은 액티비티 생성 시 어떤 컨텐츠가 어떤 외부 정보를 참조해야 하는지 설정할 수 있습니다. 현재 뉴스, 장소, 날씨, 환율, 증권을 지원합니다.</div>
+<form name="formActivityOracle" id="formActivityOracle" action="./activitypub_oracle_form_update.php" method="post" enctype="multipart/form-data">
 
-<h2 class="h2_frm">외부 정보 참조 키워드 설정</h2>
+    <div class="local_desc01 local_desc"><strong>액티비티 오라클</strong>은 액티비티 생성 시 어떤 컨텐츠가 어떤 외부 정보를 참조해야 하는지 설정할 수 있습니다. 현재 뉴스, 장소, 날씨, 환율, 증권을 지원합니다.</div>
 
-<form id="keywordForm">
+    <h2 class="h2_frm">외부 정보 참조 키워드 설정</h2>
+
     <div class="tbl_head01 tbl_wrap">
         <table id="keywordTable">
             <caption>키워드 설정 목록</caption>
@@ -28,41 +29,40 @@ add_javascript(G5_POSTCODE_JS, 0);    //다음 주소 js
                     <th scope="col" width="80">삭제</th>
                 </tr>
             </thead>
+            <template id="keywordRowTemplate" style="display: none;">
+                <tr>
+                    <td><input type="checkbox" class="row-check"></td>
+                    <td><input type="text" name="keyword[]" class="frm_input" placeholder="예: TSLA"></td>
+                    <td>
+                        <select name="type[]">
+                            <option value="search" selected>검색</option>
+                            <option value="news">뉴스</option>
+                            <option value="weather">날씨</option>
+                            <option value="exchange">환율</option>
+                            <option value="stock">증권</option>
+                        </select>
+                    </td>
+                    <td><input type="text" name="relatedKeywords[]" class="frm_input" placeholder="예: 테슬라, TSLA, 일론 머스크"></td>
+                    <td><button type="button" class="btn btn_01" onclick="removeRow(this)">삭제</button></td>
+                </tr>
+            </template>
             <tbody id="keywordTableBody">
-			    <tr>
+                <tr>
                     <td colspan="5" class="empty_table">자료가 없습니다.</td>
-				</tr>
+                </tr>
             </tbody>
         </table>
     </div>
-	
-	<div class="btn_list01 btn_list">
-		<button type="button" class="btn btn_02" onclick="addRow()">키워드 추가</button>
-		<button type="submit" class="btn btn_submit">키워드 제출</button>
-	</div>
-</form>
+    
+    <div class="btn_list01 btn_list">
+        <button type="button" class="btn btn_01" onclick="addRow()">키워드 추가</button>
+        <button type="button" class="btn btn_02" onclick="removeCheckedRows()">선택 삭제</button>
+    </div>
 
-<textarea id="keywordRowTemplate" style="display: none;" readonly>
-    <tr>
-        <td><input type="checkbox" name="cb[]" class="row-check" value=""></td>
-        <td><input type="text" name="title" class="frm_input" placeholder="예: TSLA"></td>
-        <td>
-            <select name="type">
-                <option value="search" selected>검색</option>
-                <option value="news">뉴스</option>
-                <option value="weather">날씨</option>
-                <option value="exchange">환율</option>
-                <option value="stock">증권</option>
-            </select>
-        </td>
-        <td><input type="text" name="keywords" class="frm_input" placeholder="예: 테슬라, TSLA, 일론 머스크"></td>
-        <td><button type="button" class="btn btn_01" onclick="removeRow(this)">삭제</button></td>
-    </tr>
-</textarea>
 
-<h2 class="h2_frm">API 키 설정</h2>
 
-<form id="apiKeyForm">
+    <h2 class="h2_frm">API 키 설정</h2>
+
     <div class="tbl_head01 tbl_wrap">
         <table id="apiKeyTable">
             <caption>API 키 목록</caption>
@@ -107,8 +107,10 @@ add_javascript(G5_POSTCODE_JS, 0);    //다음 주소 js
                 </tr>
             </tbody>
         </table>
-		
-		
+    </div>
+    
+    <div class="btn_fixed_top">
+        <input type="submit" name="act_button" value="전송" onclick="document.pressed=this.value" class="btn btn_01">
     </div>
 </form>
 
@@ -116,13 +118,13 @@ add_javascript(G5_POSTCODE_JS, 0);    //다음 주소 js
 function addRow() {
     const tbody = document.getElementById("keywordTableBody");
     const row = document.createElement("tr");
-	
+    
     const emptyRow = tbody.querySelector(".empty_table");
     if (emptyRow) {
       emptyRow.parentElement.remove();
     }
 
-    row.innerHTML = document.getElementById("keywordRowTemplate").innerText;
+    row.innerHTML = document.getElementById("keywordRowTemplate").innerHTML;
     tbody.appendChild(row);
     updateEmptyRow();
 }
@@ -136,10 +138,10 @@ function removeRow(button) {
 function updateEmptyRow() {
     const tbody = document.getElementById("keywordTableBody");
     const rows = Array.from(tbody.querySelectorAll("tr"));
-	console.log(rows);
-	
+    console.log(rows);
+    
     const hasDataRows = rows.some(tr => !tr.classList.contains("empty_table"));
-	
+    
     if (!hasDataRows) {
         const emptyRow = document.createElement("tr");
         emptyRow.innerHTML = `<td class="empty_table" colspan="5">자료가 없습니다.</td>`;
@@ -151,6 +153,26 @@ function keywordCheckAll(source) {
     const tbody = document.getElementById("keywordTableBody");
     const checkboxes = tbody.querySelectorAll(".row-check");
     checkboxes.forEach(cb => cb.checked = source.checked);
+}
+
+function removeCheckedRows() {
+    const tbody = document.getElementById("keywordTableBody");
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+
+    let anyRemoved = false;
+
+    rows.forEach(row => {
+        const checkbox = row.querySelector(".row-check");
+        if (checkbox && checkbox.checked) {
+            row.remove();
+            anyRemoved = true;
+        }
+    });
+
+    if (anyRemoved) {
+        document.getElementById("chkall").checked = false;
+        updateEmptyRow();
+    }
 }
 </script>
 
