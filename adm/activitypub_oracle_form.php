@@ -106,31 +106,31 @@ if (file_exists($filename)) {
             <tbody id="apiKeyTableBody">
                 <tr>
                     <td>searchapi.io</td>
-                    <td><button type="button" class="btn btn_02" data-href="">신청</button></button>
+                    <td><button type="button" class="btn btn_02" data-href="https://www.searchapi.io/?via=namhyeon">신청</button></button>
                     <td>검색, 뉴스</td>
                     <td><input type="text" name="apikey[searchapi]" class="frm_input" value="<?php echo $apconfig['apikey']['searchapi']; ?>"></td>
                 <tr>
                 <tr>
                     <td>Marketstack</th>
-                    <td><button type="button" class="btn btn_02" data-href="">신청</button></button>
+                    <td><button type="button" class="btn btn_02" data-href="https://marketstack.com?utm_source=FirstPromoter&utm_medium=Affiliate&fpr=namhyeon19">신청</button></button>
                     <td>증권</td>
                     <td><input type="text" name="apikey[marketstack]" class="frm_input" value="<?php echo $apconfig['apikey']['marketstack']; ?>"></td>
                 </tr>
                 <tr>
                     <td>OpenWeatherMap</td>
-                    <td><button type="button" class="btn btn_02" data-href="">신청</button></button>
+                    <td><button type="button" class="btn btn_02" data-href="https://openweathermap.org/">신청</button></button>
                     <td>날씨</td>
                     <td><input type="text" name="apikey[openweathermap]" class="frm_input" value="<?php echo $apconfig['apikey']['openweathermap']; ?>"></td>
                 </tr>
                 <tr>
                     <td>한국수출입은행 환율정보</td>
-                    <td><button type="button" class="btn btn_02" data-href="">신청</button></button>
+                    <td><button type="button" class="btn btn_02" data-href="https://www.koreaexim.go.kr/ir/HPHKIR020M01?apino=2">신청</button></button>
                     <td>환율</td>
                     <td><input type="text" name="apikey[koreaexim]" class="frm_input" value="<?php echo $apconfig['apikey']['koreaexim']; ?>"></td>
                 </tr>
                 <tr>
                     <td>네이버클라우드 GeoLocation</td>
-                    <td><button type="button" class="btn btn_02" data-href="">신청</button></button>
+                    <td><button type="button" class="btn btn_02" data-href="https://www.ncloud.com/product/applicationService/geoLocation">신청</button></button>
                     <td>위치정보</td>
                     <td><input type="text" name="apikey[navercloud_geolocation]" class="frm_input" value="<?php echo $apconfig['apikey']['navercloud_geolocation']; ?>"></td>
                 </tr>
@@ -203,6 +203,18 @@ function removeCheckedRows() {
         updateEmptyRow();
     }
 }
+
+document.addEventListener('click', function(event) {
+    var target = event.target;
+    if (target.tagName.toLowerCase() === 'button' && target.dataset.href) {
+        var a = document.createElement('a');
+        a.href = target.dataset.href;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+});
 </script>
 
 <?php
