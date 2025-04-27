@@ -11,12 +11,7 @@ require_once './admin.head.php';
 add_javascript(G5_POSTCODE_JS, 0);    //다음 주소 js
 
 // 설정 불러오기
-$apconfig = array();
-$filename = G5_DATA_PATH . '/' . 'apconfig.php';
-if (file_exists($filename)) {
-	$rawdata = @include($filename);
-	$apconfig = json_decode($rawdata, true);
-}
+$apconfig = activitypub_load_config();
 ?>
 
 <form name="formActivityOracle" id="formActivityOracle" action="./activitypub_oracle_form_update.php" method="post" enctype="multipart/form-data">
@@ -68,11 +63,11 @@ if (file_exists($filename)) {
                     <td><input type="text" name="keyword[]" class="frm_input" placeholder="예: Apple" value="<?php echo $query['keyword']; ?>"></td>
                     <td>
                         <select name="type[]">
-                            <option value="search"<?php echo ($query['type'] == 'search' ? '' : ' selected'); ?>>검색</option>
-                            <option value="news"<?php echo ($query['type'] == 'news' ? '' : ' selected'); ?>>뉴스</option>
-                            <option value="weather"<?php echo ($query['type'] == 'weather' ? '' : ' selected'); ?>>날씨</option>
-                            <option value="exchange"<?php echo ($query['type'] == 'exchange' ? '' : ' selected'); ?>>환율</option>
-                            <option value="stock"<?php echo ($query['type'] == 'stock' ? '' : ' selected'); ?>>증권</option>
+                            <option value="search"<?php echo ($query['type'] == 'search' ? ' selected' : ''); ?>>검색</option>
+                            <option value="news"<?php echo ($query['type'] == 'news' ? ' selected' : ''); ?>>뉴스</option>
+                            <option value="weather"<?php echo ($query['type'] == 'weather' ? ' selected' : ''); ?>>날씨</option>
+                            <option value="exchange"<?php echo ($query['type'] == 'exchange' ? ' selected' : ''); ?>>환율</option>
+                            <option value="stock"<?php echo ($query['type'] == 'stock' ? ' selected' : ''); ?>>증권</option>
                         </select>
                     </td>
                     <td><input type="text" name="relatedKeywords[]" class="frm_input" placeholder="예: 애플, 아이폰, 아이패드, 스티브 잡스, 팀 쿡, APPL" value="<?php echo implode(', ', $query['relatedKeywords']); ?>"></td>
