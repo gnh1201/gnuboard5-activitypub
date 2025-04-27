@@ -9,6 +9,14 @@ require_once './admin.head.php';
 
 // add_javascript('js 구문', 출력순서); 숫자가 작을 수록 먼저 출력됨
 add_javascript(G5_POSTCODE_JS, 0);    //다음 주소 js
+
+// 설정 불러오기
+$apconfig = array();
+$filename = G5_DATA_PATH . '/' . 'apconfig.php';
+if (file_exists($filename)) {
+	$rawdata = @include($filename);
+	$apconfig = json_decode($rawdata, true);
+}
 ?>
 
 <form name="formActivityOracle" id="formActivityOracle" action="./activitypub_oracle_form_update.php" method="post" enctype="multipart/form-data">
@@ -32,7 +40,7 @@ add_javascript(G5_POSTCODE_JS, 0);    //다음 주소 js
             <template id="keywordRowTemplate" style="display: none;">
                 <tr>
                     <td><input type="checkbox" class="row-check"></td>
-                    <td><input type="text" name="keyword[]" class="frm_input" placeholder="예: TSLA"></td>
+                    <td><input type="text" name="keyword[]" class="frm_input" placeholder="예: Apple"></td>
                     <td>
                         <select name="type[]">
                             <option value="search" selected>검색</option>
@@ -42,14 +50,37 @@ add_javascript(G5_POSTCODE_JS, 0);    //다음 주소 js
                             <option value="stock">증권</option>
                         </select>
                     </td>
-                    <td><input type="text" name="relatedKeywords[]" class="frm_input" placeholder="예: 테슬라, TSLA, 일론 머스크"></td>
+                    <td><input type="text" name="relatedKeywords[]" class="frm_input" placeholder="예: 애플, 아이폰, 아이패드, 스티브 잡스, 팀 쿡, APPL"></td>
                     <td><button type="button" class="btn btn_01" onclick="removeRow(this)">삭제</button></td>
                 </tr>
             </template>
             <tbody id="keywordTableBody">
+<?php
+				$queries = $apconfig['queries'];
+				if (count($queries) == 0) {
+					echo '<tr><td colspan="5" class="empty_table">자료가 없습니다.</td></tr>';
+				}
+
+				foreach($apconfig['queries'] as $query) {
+?>
                 <tr>
-                    <td colspan="5" class="empty_table">자료가 없습니다.</td>
+                    <td><input type="checkbox" class="row-check"></td>
+                    <td><input type="text" name="keyword[]" class="frm_input" placeholder="예: Apple" value="<?php echo $query['keyword']; ?>"></td>
+                    <td>
+                        <select name="type[]">
+                            <option value="search"<?php echo ($query['type'] == 'search' ? '' : ' selected'); ?>>검색</option>
+                            <option value="news"<?php echo ($query['type'] == 'news' ? '' : ' selected'); ?>>뉴스</option>
+                            <option value="weather"<?php echo ($query['type'] == 'weather' ? '' : ' selected'); ?>>날씨</option>
+                            <option value="exchange"<?php echo ($query['type'] == 'exchange' ? '' : ' selected'); ?>>환율</option>
+                            <option value="stock"<?php echo ($query['type'] == 'stock' ? '' : ' selected'); ?>>증권</option>
+                        </select>
+                    </td>
+                    <td><input type="text" name="relatedKeywords[]" class="frm_input" placeholder="예: 애플, 아이폰, 아이패드, 스티브 잡스, 팀 쿡, APPL" value="<?php echo implode(', ', $query['relatedKeywords']); ?>"></td>
+                    <td><button type="button" class="btn btn_01" onclick="removeRow(this)">삭제</button></td>
                 </tr>
+<?php
+				}  // endif
+?>
             </tbody>
         </table>
     </div>
@@ -58,8 +89,6 @@ add_javascript(G5_POSTCODE_JS, 0);    //다음 주소 js
         <button type="button" class="btn btn_01" onclick="addRow()">키워드 추가</button>
         <button type="button" class="btn btn_02" onclick="removeCheckedRows()">선택 삭제</button>
     </div>
-
-
 
     <h2 class="h2_frm">API 키 설정</h2>
 
@@ -77,33 +106,33 @@ add_javascript(G5_POSTCODE_JS, 0);    //다음 주소 js
             <tbody id="apiKeyTableBody">
                 <tr>
                     <td>searchapi.io</td>
-                    <td><button type="button" class="btn btn_02">신청</button></button>
+                    <td><button type="button" class="btn btn_02" data-href="">신청</button></button>
                     <td>검색, 뉴스</td>
-                    <td><input type="text" name="apikey[searchapi]" class="frm_input" value=""></td>
+                    <td><input type="text" name="apikey[searchapi]" class="frm_input" value="<?php echo $apconfig['apikey']['searchapi']; ?>"></td>
                 <tr>
                 <tr>
                     <td>Marketstack</th>
-                    <td><button type="button" class="btn btn_02">신청</button></button>
+                    <td><button type="button" class="btn btn_02" data-href="">신청</button></button>
                     <td>증권</td>
-                    <td><input type="text" name="apikey[marketstack]" class="frm_input" value=""></td>
+                    <td><input type="text" name="apikey[marketstack]" class="frm_input" value="<?php echo $apconfig['apikey']['marketstack']; ?>"></td>
                 </tr>
                 <tr>
                     <td>OpenWeatherMap</td>
-                    <td><button type="button" class="btn btn_02">신청</button></button>
+                    <td><button type="button" class="btn btn_02" data-href="">신청</button></button>
                     <td>날씨</td>
-                    <td><input type="text" name="apikey[openweathermap]" class="frm_input" value=""></td>
+                    <td><input type="text" name="apikey[openweathermap]" class="frm_input" value="<?php echo $apconfig['apikey']['openweathermap']; ?>"></td>
                 </tr>
                 <tr>
                     <td>한국수출입은행 환율정보</td>
-                    <td><button type="button" class="btn btn_02">신청</button></button>
+                    <td><button type="button" class="btn btn_02" data-href="">신청</button></button>
                     <td>환율</td>
-                    <td><input type="text" name="apikey[koreaexim]" class="frm_input" value=""></td>
+                    <td><input type="text" name="apikey[koreaexim]" class="frm_input" value="<?php echo $apconfig['apikey']['koreaexim']; ?>"></td>
                 </tr>
                 <tr>
                     <td>네이버클라우드 GeoLocation</td>
-                    <td><button type="button" class="btn btn_02">신청</button></button>
+                    <td><button type="button" class="btn btn_02" data-href="">신청</button></button>
                     <td>위치정보</td>
-                    <td><input type="text" name="apikey[navercloud_geolocation]" class="frm_input" value=""></td>
+                    <td><input type="text" name="apikey[navercloud_geolocation]" class="frm_input" value="<?php echo $apconfig['apikey']['navercloud_geolocation']; ?>"></td>
                 </tr>
             </tbody>
         </table>
@@ -144,7 +173,7 @@ function updateEmptyRow() {
     
     if (!hasDataRows) {
         const emptyRow = document.createElement("tr");
-        emptyRow.innerHTML = `<td class="empty_table" colspan="5">자료가 없습니다.</td>`;
+        emptyRow.innerHTML = '<td class="empty_table" colspan="5">자료가 없습니다.</td>';
         tbody.appendChild(emptyRow);
     }
 }
