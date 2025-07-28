@@ -132,3 +132,5 @@ GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 ## 문의
 * abuse@catswords.re.kr
 * ActivityPub [@gnh1201@catswords.social](https://catswords.social/@gnh1201)
+* [Microsoft Teams에서 Catswords OSS 가입](https://teams.live.com/l/community/FEACHncAhq8ldnojAI)
+* [Discord에서 Catswords OSS #gnuboard5-activitypub 가입](https://discord.gg/dBE65JgcBW)
