@@ -130,5 +130,5 @@ GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 * https://socialhub.activitypub.rocks/t/problems-posting-to-mastodon-inbox/801/10
 
 ## 문의
-* abuse@catswords.net
+* abuse@catswords.re.kr
 * ActivityPub [@gnh1201@catswords.social](https://catswords.social/@gnh1201)
