@@ -2,11 +2,12 @@
 if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 
 // Description: ActivityPub implementation for GNUBOARD 5
-// Author: Go Namhyeon (Catswords Research) <abuse@catswords.net>
+// Author: Namhyeon Go (Catswords Research) <gnh1201@catswords.re.kr>
 // ActivityPub: @gnh1201@catswords.social
 // License: MIT
-// Date: 2023-08-08
-// Version: 0.1.18
+// First released date: 2023-08-08
+// Last updated date: 2026-09-15
+// Version: 0.1.19-dev
 // References:
 //   * https://www.w3.org/TR/activitypub/
 //   * https://www.w3.org/TR/activitystreams-core/
@@ -23,11 +24,12 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://socialhub.activitypub.rocks/t/problems-posting-to-mastodon-inbox/801/10
 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
-define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.18");
+define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.19-dev");
 define("ACTIVITYPUB_DEFAULT_SCHEME", "https");    // 외부 통신용 스킴 (SSL 사용이 기본)
-define("ACTIVITYPUB_INSECURE_SCHEME", "http");    // 그누보드5 ActivityPub 통신용 스킴 (SSL 사용을 하지 않을 수도 있음을 고려)
+define("ACTIVITYPUB_INSECURE_SCHEME", "http");
+define("ACTIVITYPUB_ALLOW_INSECURE_SCHEME", false);  // 비암호화 통신 지원 (운영환경에서 활성화 금지)
 define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
-define("ACTIVITYPUB_URL", (empty(G5_URL) ? ACTIVITYPUB_INSECURE_SCHEME . "://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
+define("ACTIVITYPUB_URL", (empty(G5_URL) ? ACTIVITYPUB_DEFAULT_SCHEME . "://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
 define("ACTIVITYPUB_G5_BOARDNAME", "apstreams");
 define("ACTIVITYPUB_G5_TABLENAME", $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME);
@@ -39,13 +41,11 @@ define("ACTIVITYPUB_CERTIFICATE_RETRY", 10);    // 최대 인증서 생성 시�
 define("ACTIVITYPUB_CERTIFICATE_DATAFIELD", "mb_9");    // 회원별 인증서(공개키, 개인키)를 저장할 필드 (기본: mb_9)
 define("OAUTH2_GRANT_DATAFIELD", "mb_10");    // 회원별 인증 정보를 저장할 필드 (기본: mb_10)
 define("DEFAULT_HTML_ENTITY_FLAGS", ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
+define("DEFAULT_SSL_VERIFYPEER", true);   // 2026-09-15 보안통신(SSL) 검증 강제 (KVE-2026-2202 권고)
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
 define("NAMESPACE_W3ID_SECURITY_V1", "https://w3id.org/security/v1");
 define("ACTIVITYPUB_ENABLED_GEOLOCATION", false);   // 위치정보 활성화 (https://lite.ip2location.com/)
-define("NAVERCLOUD_ENABLED_GEOLOCATION", false);   // 국내용 위치정보 활성화 (https://www.ncloud.com/product/applicationService/geoLocation)
-define("NAVERCLOUD_API_ACCESS_KEY", "");   // 네이버 클라우드 API 키 설정
-define("NAVERCLOUD_API_SECRET_KEY", "");   // 네이버 클라우드 API 키 설정
 define("OPENWEATHERMAP_ENABLED", false);   // 날씨정보 활성화
 define("OPENWEATHERMAP_API_KEY", "");   // 날씨정보 API 키 (https://openweathermap.org/api/one-call-3)
 define("KOREAEXIM_ENABLED", false);   // 환율정보 활성화
@@ -417,7 +417,7 @@ function activitypub_http_get($url, $access_token = '') {
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
         CURLOPT_HTTPHEADER => activitypub_build_http_headers($headers),
-        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true
     ));
@@ -471,7 +471,7 @@ function activitypub_http_post($url, $rawdata, $mb, $access_token = '') {
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
         CURLOPT_HTTPHEADER => activitypub_build_http_headers($headers),
-        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POSTFIELDS => $rawdata,
@@ -489,39 +489,6 @@ function activitypub_http_post($url, $rawdata, $mb, $access_token = '') {
     return activitypub_json_decode($response, true);
 }
 
-function navercloud_get_geolocation($ip) {
-    $params = array(
-        "ip" => $ip,
-        "enc" => "utf8",
-        "ext" => "t",
-        "responseFormatType" => "json"
-    );
-    $timestamp = floor(microtime(true) * 1000);
-    $uri = "/geolocation/v2/geoLocation?" . http_build_query($params);
-    $endpoint_url = "https://geolocation.apigw.ntruss.com" . $uri;
-    $message = "GET " . $uri . "\n" . $timestamp . "\n" . NAVERCLOUD_API_ACCESS_KEY;
-    $sig = base64_encode(hash_hmac("sha256", $message, NAVERCLOUD_API_SECRET_KEY, true));
-
-    $headers = activitypub_build_http_headers(array(
-        "x-ncp-apigw-timestamp" => $timestamp,
-        "x-ncp-iam-access-key" => NAVERCLOUD_API_ACCESS_KEY,
-        "x-ncp-apigw-signature-v2" => $sig
-    ));
-
-    $ch = curl_init();
-    curl_setopt_array($ch, array(
-        CURLOPT_URL => $endpoint_url,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_RETURNTRANSFER => true
-    ));
-    $response = curl_exec($ch);
-    curl_close($ch);
-
-    return activitypub_json_decode($response);
-}
-
 function openweathermap_get_data($args = array("longitude" => "", "latitude" => "")) {
     $params = array(
         "lat" => $args['latitude'],
@@ -534,7 +501,7 @@ function openweathermap_get_data($args = array("longitude" => "", "latitude" => 
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
-        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true
     ));
@@ -561,7 +528,7 @@ function koreaexim_get_exchange_data() {
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
-        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true
     ));
@@ -602,29 +569,6 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
 
         // 위치정보 불러오기
         $records = $ip2location_library_data['records'];
-
-        // 국내 위치 확인
-        if (NAVERCLOUD_ENABLED_GEOLOCATION) {
-            if ($records['countryCode'] == "KR") {
-                // 국내 위치정보 요청
-                $response = navercloud_get_geolocation($records['ipAddress']);
-
-                // 정상적으로 반환된 경우
-                if ($response['returnCode'] === 0) {
-                    $records['cityName'] = implode(", ", array(
-                        implode(" ", array(
-                            $response['geoLocation']['r1'],
-                            $response['geoLocation']['r2'],
-                            $response['geoLocation']['r3'],
-                            "(" . $response['geoLocation']['net'] . ")"
-                        )),
-                        $records['cityName']
-                    ));
-                    $records['longitude'] = $response['geoLocation']['long'];
-                    $records['latitude'] = $response['geoLocation']['lat'];
-                }
-            }
-        }
 
         // 위치정보 전문 작성
         $location_ctx = array(
@@ -681,27 +625,37 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
             case "account":
                 // WebFinger 정보 수신
                 $account = substr($term_ctx['value'], 1);
+                
+                // 2026-09-16 수신자 표기 확인
+                if (substr_count($account, '@') !== 1) {
+                    activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[발송실패] 정상적이지 않은 수신자: @" . $account);
+                    break;
+                }
+                
+                // 수신자에 연결
                 $account_terms = explode('@', $account);
                 $account_ctx = array("username" => $account_terms[0], "host" => $account_terms[1]);
                 $webfigner_ctx = array("subject" => "");
                 if (!empty($account_ctx['host'])) {
-                    $counter = 2;    // WebFinger에 연결하는 경우의 수 정의 (=N-1)
-                    while ($counter > -1 && $webfigner_ctx['subject'] != ("acct:" . $account)) {
-                        switch($counter) {
+                    $junction = 2; // WebFinger에 연결하는 경로 지정
+                    while ($junction > -1 && $webfigner_ctx['subject'] != ("acct:" . $account)) {
+                        switch($junction) {
                             case 0:    // 공통 WebFinger에 연결
                                 $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_DEFAULT_SCHEME . "://" . $account_ctx['host'] . "/.well-known/webfinger?resource=acct:" . $account);
                                 break;
                             case 1:    // 실패시, 그누보드5용 WebFinger에 연결
                                 $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_DEFAULT_SCHEME . "://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
                                 break;
-                            case 2:    // 실패시, 그누보드5용 WebFinger에 연결 + 보안통신 해제
-                                $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_INSECURE_SCHEME . "://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
+                            case 2:    // 실패시, 그누보드5용 WebFinger에 연결 + 보안통신 해제 (허용된 경우에만)
+                                if (ACTIVITYPUB_ALLOW_INSECURE_SCHEME) {
+                                    $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_INSECURE_SCHEME . "://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
+                                }
                                 break;
                             default:
-                                $counter = -1;
+                                $junction = -1;
                         }
-
-                        $counter--;   // 시도 횟수 차감
+                        
+                        $junction--;   // WebFinger에 연결하는 경로 변경
                     }
 
                     // WebFinger 정보 수신을 못한 경우, 쪽지로 알리고 아무 작업도 하지 않음
@@ -785,17 +739,41 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
 
         // inbox 주소가 없으면 건너뛰기
         if (empty($remote_inbox_url)) {
-            activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "이 사용자 또는 서버는 메시지를 수신할 수 없는 상태임: " . $_to);
+            activitypub_add_memo(
+                ACTIVITYPUB_G5_USERNAME,
+                $mb['mb_id'],
+                "이 사용자 또는 서버는 메시지를 수신할 수 없는 상태임: " . $_to
+            );
+            continue;
+        }
+
+        // 2026-09-16 보안 통신을 지원하지 않는 inbox는 건너뛰기
+        if (parse_url($remote_inbox_url, PHP_URL_SCHEME) !== ACTIVITYPUB_DEFAULT_SCHEME && !ACTIVITYPUB_ALLOW_INSECURE_SCHEME) {
+            activitypub_add_memo(
+                ACTIVITYPUB_G5_USERNAME,
+                $mb['mb_id'],
+                "이 사용자 또는 서버는 보안통신(HTTPS)을 지원하지 않아 메시지를 전송할 수 없음: " . $_to
+            );
             continue;
         }
 
         // 엑세스 토큰(Access Token)이 존재하는 목적지인 경우
+        // 2026-09-16 보안 통신(HTTPS)을 우선하며, 비보안통신은 허용된 경우에만 시도
         $access_token = '';
         $access_token_data = activitypub_parse_stored_data(ACTIVITYPUB_ACCESS_TOKEN);
-        foreach($access_token_data as $k=>$v) {
-            if(strpos($_to, "http://" . $k . "/") !== false || strpos($_to, "https://" . $k . "/") !== false) {
-                $access_token = $v;
+        foreach ($access_token_data as $host => $token) {
+            $remote_host_url = ACTIVITYPUB_DEFAULT_SCHEME . '://' . $host . '/';
+            if (strpos($_to, $remote_host_url) !== false) {
+                $access_token = $token;
                 break;
+            }
+            
+            if (ACTIVITYPUB_ALLOW_INSECURE_SCHEME) {
+                $remote_host_insecure_url = ACTIVITYPUB_INSECURE_SCHEME . '://' . $host . '/';
+                if (strpos($_to, $remote_host_insecure_url) !== false) {
+                    $access_token = $token;
+                    break;
+                }
             }
         }
 
