@@ -7,7 +7,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // License: MIT
 // First released date: 2023-08-08
 // Last updated date: 2026-09-25
-// Version: 0.1.19-dev
+// Version: 0.1.19
 // References:
 //   * https://www.w3.org/TR/activitypub/
 //   * https://www.w3.org/TR/activitystreams-core/
