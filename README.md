@@ -30,7 +30,7 @@ GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 - [x] File attachment
 - [ ] File attachment - Automatically download a remote file to the local server
 - [x] Digest/Signature - Outbound
-- [x] Digest/Signature - Inbound (KVE-2026-2202)
+- [x] Digest/Signature - Inbound (KVE-2026-2199, KVE-2026-2202)
 - [x] w3id.org (e.g., the `publicKey` field of an actor)
 - [ ] OAuth 2.0
 - [ ] Message Queue integration (e.g., Redis, RebbitMQ, Kafka)
