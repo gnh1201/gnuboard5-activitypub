@@ -11,7 +11,7 @@
 > 
 > 아래 테스트 웹사이트에서 GNUBOARD5-ActivityPub 플러그인을 테스트할 수 있습니다. 가입할 때 지정한 ID와 도메인이 ActivityPub Actor ID가 됩니다. 예: `@admin@catswords.iwinv.net`
 > 
-> https://catswords.iwinv.net/
+> https://catswords.iwinv.net/ (2026-09-26 기준 접속 가능)
 
 GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 
