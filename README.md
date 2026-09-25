@@ -24,7 +24,7 @@ GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 - [x] File attachment
 - [ ] File attachment - Automatically download a remote file to the local server
 - [x] Digest/Signature - Outbound
-- [ ] ~~Digest/Signature - Inbound~~ (No required)
+- [x] Digest/Signature - Inbound (KVE-2026-2202)
 - [x] w3id.org (e.g., the `publicKey` field of an actor)
 - [ ] OAuth 2.0
 - [ ] Message Queue integration (e.g., Redis, RebbitMQ, Kafka)
@@ -33,7 +33,7 @@ GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 - [x] 아바타 (gravatar.com)
 - [x] 날씨 (openweathermap.org)
 - [x] 환율 (koreaexim.go.kr)
-- [x] 국내 Geolocation (Naver Cloud)
+- [x] ~~국내 Geolocation (Naver Cloud)~~ (Discontinued)
 - [x] 국외 Geolocation (IP2Location)
 
 ## 전문(메시지) 예시
