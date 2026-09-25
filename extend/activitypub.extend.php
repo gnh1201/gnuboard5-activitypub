@@ -6,7 +6,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub: @gnh1201@catswords.social
 // License: MIT
 // First released date: 2023-08-08
-// Last updated date: 2026-09-15
+// Last updated date: 2026-09-25
 // Version: 0.1.19-dev
 // References:
 //   * https://www.w3.org/TR/activitypub/
@@ -28,6 +28,7 @@ define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.19-dev");
 define("ACTIVITYPUB_DEFAULT_SCHEME", "https");    // 외부 통신용 스킴 (SSL 사용이 기본)
 define("ACTIVITYPUB_INSECURE_SCHEME", "http");
 define("ACTIVITYPUB_ALLOW_INSECURE_SCHEME", false);  // 비암호화 통신 지원 (운영환경에서 활성화 금지)
+define("ACTIVITYPUB_ALLOW_MISSING_SIGNATURE", false);  // 2026-09-25, HTTP 서명(Signature) 검증 여부 (웹호스팅 등 미지원 환경에선 true), KVE-2026-2202 권고 반영
 define("ACTIVITYPUB_HOST", (empty(G5_HTTPS_DOMAIN) ? $_SERVER['HTTP_HOST'] : substr(G5_HTTPS_DOMAIN, strlen(ACTIVITYPUB_DEFAULT_SCHEME) + 3))); // 2026-09-25, 잠재적 버그 픽스
 define("ACTIVITYPUB_URL", (empty(G5_URL) ? ACTIVITYPUB_DEFAULT_SCHEME . "://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
@@ -402,23 +403,34 @@ function activitypub_build_signature($url, $date, $digest, $mb, $method="post") 
 
 // 2026-09-25, HTTP Signature 검증, KVE-2026-2202 권고 반영
 function activitypub_verify_signature($actor, $rawdata) {
-    // Signature 헤더가 없으면 서명을 사용하지 않는 요청으로 처리.
-    // 웹호스팅 등의 자원 공유 환경에서는 Signature 헤더의 수신이 지원되지 않을 수 있음.
-    if (empty($_SERVER['HTTP_SIGNATURE'])) {
-        return array(
-            "result" => true,
-            "error" => ""
-        );
+    // 서버에서 수신한 Signature 헤더 원문
+    $raw_signature = $_SERVER['HTTP_SIGNATURE'];
+    
+    // HTTP 서명(Signature) 헤더가 없을 때 처리
+    if (empty($raw_signature)) {
+        if (ACTIVITYPUB_ALLOW_MISSING_SIGNATURE) {
+            // HTTP 서명(Signature)이 없는 경우를 허용할 때
+            return array(
+                "result" => true,
+                "error" => "",
+                "signature" => ""
+            );
+        } else {
+            // HTTP 서명(Signature)이 없는 경우를 허용하지 않을 때
+            return array(
+                "result" => false,
+                "error" => "Missing HTTP Signature",
+                "signature" => $raw_signature
+            );
+        }
     }
-
-    $signature_header = $_SERVER['HTTP_SIGNATURE'];
 
     // Signature 헤더 파싱
     $signature_data = array();
 
     if (preg_match_all(
         '/([a-zA-Z0-9_-]+)="([^"]*)"/',
-        $signature_header,
+        $raw_signature,
         $matches,
         PREG_SET_ORDER
     )) {
@@ -433,7 +445,8 @@ function activitypub_verify_signature($actor, $rawdata) {
         empty($signature_data['signature'])) {
         return array(
             "result" => false,
-            "error" => "Invalid Signature header"
+            "error" => "Invalid Signature header",
+            "signature" => $raw_signature
         );
     }
 
@@ -445,7 +458,8 @@ function activitypub_verify_signature($actor, $rawdata) {
         empty($actor['publicKey']['publicKeyPem'])) {
         return array(
             "result" => false,
-            "error" => "Actor public key is not available"
+            "error" => "Actor public key is not available",
+            "signature" => $raw_signature
         );
     }
 
@@ -453,7 +467,8 @@ function activitypub_verify_signature($actor, $rawdata) {
     if ($signature_data['keyId'] !== $actor['publicKey']['id']) {
         return array(
             "result" => false,
-            "error" => "Signature keyId does not match actor public key"
+            "error" => "Signature keyId does not match actor public key",
+            "signature" => $raw_signature
         );
     }
 
@@ -461,7 +476,8 @@ function activitypub_verify_signature($actor, $rawdata) {
     if ($actor['publicKey']['owner'] !== $actor['id']) {
         return array(
             "result" => false,
-            "error" => "Public key owner does not match actor"
+            "error" => "Public key owner does not match actor",
+            "signature" => $raw_signature
         );
     }
 
@@ -471,94 +487,102 @@ function activitypub_verify_signature($actor, $rawdata) {
         strtolower(trim($signature_data['headers']))
     );
 
-    // 현재 구현에서 사용하는 서명 대상 헤더 확인
-    $required_headers = array(
-        "(request-target)",
-        "host",
-        "date",
-        "digest"
-    );
+    // 서명 대상 문자열 생성
+    $signature_lines = array();
 
-    foreach ($required_headers as $required_header) {
-        if (!in_array($required_header, $signed_headers)) {
-            return array(
-                "result" => false,
-                "error" => "Required signed header is missing: " . $required_header
-            );
+    foreach ($signed_headers as $signed_header) {
+        switch ($signed_header) {
+            case "(request-target)":
+                // HTTP 메서드와 요청 경로 확인
+                $method = strtolower($_SERVER['REQUEST_METHOD']);
+
+                $path = parse_url(
+                    isset($_SERVER['REQUEST_URI'])
+                        ? $_SERVER['REQUEST_URI']
+                        : '/',
+                    PHP_URL_PATH
+                );
+
+                if (empty($path)) {
+                    $path = '/';
+                }
+
+                // 쿼리 문자열이 존재하면 request-target에 포함
+                if (!empty($_SERVER['QUERY_STRING'])) {
+                    $path .= '?' . $_SERVER['QUERY_STRING'];
+                }
+
+                $signature_lines[] =
+                    "(request-target): " . $method . " " . $path;
+                break;
+
+            case "host":
+                // Host 헤더 확인
+                if (empty($_SERVER['HTTP_HOST'])) {
+                    return array(
+                        "result" => false,
+                        "error" => "Host header is missing",
+                        "signature" => $raw_signature
+                    );
+                }
+
+                $signature_lines[] =
+                    "host: " . $_SERVER['HTTP_HOST'];
+                break;
+
+            case "date":
+                // Date 헤더 확인
+                if (empty($_SERVER['HTTP_DATE'])) {
+                    return array(
+                        "result" => false,
+                        "error" => "Date header is missing",
+                        "signature" => $raw_signature
+                    );
+                }
+
+                $signature_lines[] =
+                    "date: " . $_SERVER['HTTP_DATE'];
+                break;
+
+            case "digest":
+                // Digest 헤더 확인
+                if (empty($_SERVER['HTTP_DIGEST'])) {
+                    return array(
+                        "result" => false,
+                        "error" => "Digest header is missing",
+                        "signature" => $raw_signature
+                    );
+                }
+
+                $signature_lines[] =
+                    "digest: " . $_SERVER['HTTP_DIGEST'];
+                break;
+
+            case "content-type":
+                // Content-Type 헤더 확인
+                if (empty($_SERVER['CONTENT_TYPE'])) {
+                    return array(
+                        "result" => false,
+                        "error" => "Content-Type header is missing",
+                        "signature" => $raw_signature
+                    );
+                }
+
+                $signature_lines[] =
+                    "content-type: " . $_SERVER['CONTENT_TYPE'];
+                break;
+
+            default:
+                return array(
+                    "result" => false,
+                    "error" => "Unsupported signed header: " . $signed_header,
+                    "signature" => $raw_signature
+                );
         }
     }
 
-    // HTTP 요청 정보 확인
-    $method = strtolower($_SERVER['REQUEST_METHOD']);
-
-    $path = parse_url(
-        isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/',
-        PHP_URL_PATH
-    );
-
-    if (empty($path)) {
-        $path = '/';
-    }
-
-    // 쿼리 문자열이 존재하면 request-target에 포함
-    if (!empty($_SERVER['QUERY_STRING'])) {
-        $path .= '?' . $_SERVER['QUERY_STRING'];
-    }
-
-    // Host 헤더 확인
-    $host = '';
-
-    if (!empty($_SERVER['HTTP_HOST'])) {
-        $host = $_SERVER['HTTP_HOST'];
-    }
-
-    if (empty($host)) {
-        return array(
-            "result" => false,
-            "error" => "Host header is missing"
-        );
-    }
-
-    // Date 헤더 확인
-    if (empty($_SERVER['HTTP_DATE'])) {
-        return array(
-            "result" => false,
-            "error" => "Date header is missing"
-        );
-    }
-
-    $date = $_SERVER['HTTP_DATE'];
-
-    // Digest 헤더 확인
-    if (empty($_SERVER['HTTP_DIGEST'])) {
-        return array(
-            "result" => false,
-            "error" => "Digest header is missing"
-        );
-    }
-
-    $digest = $_SERVER['HTTP_DIGEST'];
-
-    // 요청 본문이 실제 Digest와 일치하는지 확인
-    if (activitypub_build_digest($rawdata) !== $digest) {
-        return array(
-            "result" => false,
-            "error" => "Digest does not match request body"
-        );
-    }
-
     // 서명 대상 문자열 생성
-    $signature = sprintf(
-        "%s: %s\n%s: %s\n%s: %s\n%s: %s",
-        "(request-target)",
-        $method . " " . $path,
-        "host",
-        $host,
-        "date",
-        $date,
-        "digest",
-        $digest
-    );
+    $signature = implode("\n", $signature_lines);
 
     // Base64 서명 디코딩
     $signature_binary = base64_decode(
@@ -569,7 +593,8 @@ function activitypub_verify_signature($actor, $rawdata) {
     if ($signature_binary === false) {
         return array(
             "result" => false,
-            "error" => "Invalid Signature encoding"
+            "error" => "Invalid Signature encoding",
+            "signature" => $raw_signature
         );
     }
 
@@ -584,13 +609,15 @@ function activitypub_verify_signature($actor, $rawdata) {
     if ($verify_result !== 1) {
         return array(
             "result" => false,
-            "error" => "Signature verification failed"
+            "error" => "Signature verification failed",
+            "signature" => $raw_signature
         );
     }
 
     return array(
         "result" => true,
-        "error" => ""
+        "error" => "",
+        "signature" => $raw_signature
     );
 }
 
@@ -1294,8 +1321,6 @@ function activitypub_verify_actor($actor_url) {
     );
 }
 
-
-
 class _GNUBOARD_ActivityPub {
     public static function open() {
         header("Content-Type: application/activity+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
@@ -1449,13 +1474,13 @@ class _GNUBOARD_ActivityPub {
                 // 2026-09-25, 행위자(actor) 검증을 시도하고 검증에 실패하면 요청 거절, KVE-2026-2199 권고 반영
                 $actor_verification = activitypub_verify_actor($data['actor']);
                 if (!$actor_verification['result']) {
-					activitypub_add_memo(
-						ACTIVITYPUB_G5_USERNAME,
-						ACTIVITYPUB_G5_USERNAME,
-						"[ActivityPub 경고] 행위자(Actor) 검증 실패: " . strip_tags($data['actor']) .
-						"\r\n\r\n" .
-						"실패 사유: " . $actor_verification['error']
-					);
+                    activitypub_add_memo(
+                        ACTIVITYPUB_G5_USERNAME,
+                        ACTIVITYPUB_G5_USERNAME,
+                        "[ActivityPub 경고] 행위자(Actor) 검증 실패: " . strip_tags($data['actor']) .
+                        "\r\n\r\n" .
+                        "실패 사유: " . $actor_verification['error']
+                    );
                     return activitypub_json_encode(array(
                         "message" => $actor_verification['error']
                     ));
@@ -1465,13 +1490,16 @@ class _GNUBOARD_ActivityPub {
                 $actor = $actor_verification['actor'];
                 $signature_verification = activitypub_verify_signature($actor, $rawdata);
                 if (!$signature_verification['result']) {
-					activitypub_add_memo(
-						ACTIVITYPUB_G5_USERNAME,
-						ACTIVITYPUB_G5_USERNAME,
-						"[ActivityPub 경고] HTTP 서명(Signature) 검증 실패: " . strip_tags($data['actor']) .
-						"\r\n\r\n" .
-						"실패 사유: " . $signature_verification['error']
-					);
+                    activitypub_add_memo(
+                        ACTIVITYPUB_G5_USERNAME,
+                        ACTIVITYPUB_G5_USERNAME,
+                        "[ActivityPub 경고] HTTP 서명(Signature) 검증 실패: " . strip_tags($data['actor']) .
+                        "\r\n\r\n" .
+                        "실패 사유: " . $signature_verification['error'] .
+                        "\r\n\r\n" . 
+                        "원본 서명: \r\n" . 
+                        $signature_verification['signature']
+                    );
                     return activitypub_json_encode(array(
                         "message" => $signature_verification['error']
                     ));
