@@ -28,7 +28,7 @@ define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.19-dev");
 define("ACTIVITYPUB_DEFAULT_SCHEME", "https");    // 외부 통신용 스킴 (SSL 사용이 기본)
 define("ACTIVITYPUB_INSECURE_SCHEME", "http");
 define("ACTIVITYPUB_ALLOW_INSECURE_SCHEME", false);  // 비암호화 통신 지원 (운영환경에서 활성화 금지)
-define("ACTIVITYPUB_HOST", (empty(G5_DOMAIN) ? $_SERVER['HTTP_HOST'] : G5_DOMAIN));
+define("ACTIVITYPUB_HOST", (empty(G5_HTTPS_DOMAIN) ? $_SERVER['HTTP_HOST'] : substr(G5_HTTPS_DOMAIN, strlen(ACTIVITYPUB_DEFAULT_SCHEME) + 3))); // 2026-09-25, 잠재적 버그 픽스
 define("ACTIVITYPUB_URL", (empty(G5_URL) ? ACTIVITYPUB_DEFAULT_SCHEME . "://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
 define("ACTIVITYPUB_G5_BOARDNAME", "apstreams");
@@ -41,7 +41,7 @@ define("ACTIVITYPUB_CERTIFICATE_RETRY", 10);    // 최대 인증서 생성 시�
 define("ACTIVITYPUB_CERTIFICATE_DATAFIELD", "mb_9");    // 회원별 인증서(공개키, 개인키)를 저장할 필드 (기본: mb_9)
 define("OAUTH2_GRANT_DATAFIELD", "mb_10");    // 회원별 인증 정보를 저장할 필드 (기본: mb_10)
 define("DEFAULT_HTML_ENTITY_FLAGS", ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
-define("DEFAULT_SSL_VERIFYPEER", true);   // 2026-09-15 보안통신(SSL) 검증 강제 (KVE-2026-2202 권고)
+define("DEFAULT_SSL_VERIFYPEER", true);   // 2026-09-15, 보안통신(SSL) 검증 강제, KVE-2026-2202 권고 반영
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
 define("NAMESPACE_ACTIVITYSTREAMS_PUBLIC", "https://www.w3.org/ns/activitystreams#Public");
 define("NAMESPACE_W3ID_SECURITY_V1", "https://w3id.org/security/v1");
@@ -400,6 +400,200 @@ function activitypub_build_signature($url, $date, $digest, $mb, $method="post") 
     return 'keyId="' . $keyId . '",headers="(request-target) host date digest",signature="' . $signature . '"';
 }
 
+// 2026-09-25, HTTP Signature 검증, KVE-2026-2202 권고 반영
+function activitypub_verify_signature($actor, $rawdata) {
+    // Signature 헤더가 없으면 서명을 사용하지 않는 요청으로 처리.
+    // 웹호스팅 등의 자원 공유 환경에서는 Signature 헤더의 수신이 지원되지 않을 수 있음.
+    if (empty($_SERVER['HTTP_SIGNATURE'])) {
+        return array(
+            "result" => true,
+            "error" => ""
+        );
+    }
+
+    $signature_header = $_SERVER['HTTP_SIGNATURE'];
+
+    // Signature 헤더 파싱
+    $signature_data = array();
+
+    if (preg_match_all(
+        '/([a-zA-Z0-9_-]+)="([^"]*)"/',
+        $signature_header,
+        $matches,
+        PREG_SET_ORDER
+    )) {
+        foreach ($matches as $match) {
+            $signature_data[$match[1]] = $match[2];
+        }
+    }
+
+    // 필수 Signature 정보 확인
+    if (empty($signature_data['keyId']) ||
+        empty($signature_data['headers']) ||
+        empty($signature_data['signature'])) {
+        return array(
+            "result" => false,
+            "error" => "Invalid Signature header"
+        );
+    }
+
+    // Actor의 공개키 정보 확인
+    if (empty($actor['publicKey']) ||
+        !is_array($actor['publicKey']) ||
+        empty($actor['publicKey']['id']) ||
+        empty($actor['publicKey']['owner']) ||
+        empty($actor['publicKey']['publicKeyPem'])) {
+        return array(
+            "result" => false,
+            "error" => "Actor public key is not available"
+        );
+    }
+
+    // Signature의 keyId가 Actor의 공개키와 일치하는지 확인
+    if ($signature_data['keyId'] !== $actor['publicKey']['id']) {
+        return array(
+            "result" => false,
+            "error" => "Signature keyId does not match actor public key"
+        );
+    }
+
+    // 공개키의 owner가 Actor와 일치하는지 확인
+    if ($actor['publicKey']['owner'] !== $actor['id']) {
+        return array(
+            "result" => false,
+            "error" => "Public key owner does not match actor"
+        );
+    }
+
+    // 서명 대상 헤더 파싱
+    $signed_headers = preg_split(
+        '/\s+/',
+        strtolower(trim($signature_data['headers']))
+    );
+
+    // 현재 구현에서 사용하는 서명 대상 헤더 확인
+    $required_headers = array(
+        "(request-target)",
+        "host",
+        "date",
+        "digest"
+    );
+
+    foreach ($required_headers as $required_header) {
+        if (!in_array($required_header, $signed_headers)) {
+            return array(
+                "result" => false,
+                "error" => "Required signed header is missing: " . $required_header
+            );
+        }
+    }
+
+    // HTTP 요청 정보 확인
+    $method = strtolower($_SERVER['REQUEST_METHOD']);
+
+    $path = parse_url(
+        isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/',
+        PHP_URL_PATH
+    );
+
+    if (empty($path)) {
+        $path = '/';
+    }
+
+    // 쿼리 문자열이 존재하면 request-target에 포함
+    if (!empty($_SERVER['QUERY_STRING'])) {
+        $path .= '?' . $_SERVER['QUERY_STRING'];
+    }
+
+    // Host 헤더 확인
+    $host = '';
+
+    if (!empty($_SERVER['HTTP_HOST'])) {
+        $host = $_SERVER['HTTP_HOST'];
+    }
+
+    if (empty($host)) {
+        return array(
+            "result" => false,
+            "error" => "Host header is missing"
+        );
+    }
+
+    // Date 헤더 확인
+    if (empty($_SERVER['HTTP_DATE'])) {
+        return array(
+            "result" => false,
+            "error" => "Date header is missing"
+        );
+    }
+
+    $date = $_SERVER['HTTP_DATE'];
+
+    // Digest 헤더 확인
+    if (empty($_SERVER['HTTP_DIGEST'])) {
+        return array(
+            "result" => false,
+            "error" => "Digest header is missing"
+        );
+    }
+
+    $digest = $_SERVER['HTTP_DIGEST'];
+
+    // 요청 본문이 실제 Digest와 일치하는지 확인
+    if (activitypub_build_digest($rawdata) !== $digest) {
+        return array(
+            "result" => false,
+            "error" => "Digest does not match request body"
+        );
+    }
+
+    // 서명 대상 문자열 생성
+    $signature = sprintf(
+        "%s: %s\n%s: %s\n%s: %s\n%s: %s",
+        "(request-target)",
+        $method . " " . $path,
+        "host",
+        $host,
+        "date",
+        $date,
+        "digest",
+        $digest
+    );
+
+    // Base64 서명 디코딩
+    $signature_binary = base64_decode(
+        $signature_data['signature'],
+        true
+    );
+
+    if ($signature_binary === false) {
+        return array(
+            "result" => false,
+            "error" => "Invalid Signature encoding"
+        );
+    }
+
+    // 공개키로 서명 검증
+    $verify_result = openssl_verify(
+        $signature,
+        $signature_binary,
+        $actor['publicKey']['publicKeyPem'],
+        OPENSSL_ALGO_SHA256
+    );
+
+    if ($verify_result !== 1) {
+        return array(
+            "result" => false,
+            "error" => "Signature verification failed"
+        );
+    }
+
+    return array(
+        "result" => true,
+        "error" => ""
+    );
+}
+
 function activitypub_http_get($url, $access_token = '') {
     // build the header
     $headers = array(
@@ -417,7 +611,7 @@ function activitypub_http_get($url, $access_token = '') {
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
         CURLOPT_HTTPHEADER => activitypub_build_http_headers($headers),
-        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER,
+        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER, // 2026-09-15, KVE-2026-2202 권고 반영
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true
     ));
@@ -471,7 +665,7 @@ function activitypub_http_post($url, $rawdata, $mb, $access_token = '') {
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
         CURLOPT_HTTPHEADER => activitypub_build_http_headers($headers),
-        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER,
+        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER, // 2026-09-15, KVE-2026-2202 권고 반영
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POSTFIELDS => $rawdata,
@@ -483,7 +677,7 @@ function activitypub_http_post($url, $rawdata, $mb, $access_token = '') {
 
     // 전송 오류가 있었을 시 쪽지로 알림
     if ($errno) {
-        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[경고] 메시지 전송 중 오류가 발생함. 오류 번호: " . $errno);
+        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[ActivityPub 경고] 메시지 전송 중 오류가 발생함. 오류 번호: " . $errno);
     }
 
     return activitypub_json_decode($response, true);
@@ -501,7 +695,7 @@ function openweathermap_get_data($args = array("longitude" => "", "latitude" => 
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
-        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER,
+        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER, // 2026-09-15, KVE-2026-2202 권고 반영
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true
     ));
@@ -528,7 +722,7 @@ function koreaexim_get_exchange_data() {
     $ch = curl_init();
     curl_setopt_array($ch, array(
         CURLOPT_URL => $url,
-        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER,
+        CURLOPT_SSL_VERIFYPEER => DEFAULT_SSL_VERIFYPEER, // 2026-09-15, KVE-2026-2202 권고 반영
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_RETURNTRANSFER => true
     ));
@@ -626,9 +820,9 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
                 // WebFinger 정보 수신
                 $account = substr($term_ctx['value'], 1);
                 
-                // 2026-09-16 수신자 표기 확인
+                // 2026-09-16, 수신자 표기 확인, KVE-2026-2202 권고 반영
                 if (substr_count($account, '@') !== 1) {
-                    activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[발송실패] 정상적이지 않은 수신자: @" . $account);
+                    activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[발송실패] 정상적이지 않은 수신자: @" . strip_tags($account));
                     break;
                 }
                 
@@ -647,6 +841,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
                                 $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_DEFAULT_SCHEME . "://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
                                 break;
                             case 2:    // 실패시, 그누보드5용 WebFinger에 연결 + 보안통신 해제 (허용된 경우에만)
+                                // 2026-09-16, KVE-2026-2202 권고 반영
                                 if (ACTIVITYPUB_ALLOW_INSECURE_SCHEME) {
                                     $webfigner_ctx = activitypub_http_get(ACTIVITYPUB_INSECURE_SCHEME . "://" . $account_ctx['host'] . "/?route=webfinger&resource=acct:" . $account);
                                 }
@@ -660,7 +855,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
 
                     // WebFinger 정보 수신을 못한 경우, 쪽지로 알리고 아무 작업도 하지 않음
                     if (empty($webfigner_ctx['subject'])) {
-                        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[발송실패] 수신자를 찾을 수 없음: @" . $account);
+                        activitypub_add_memo(ACTIVITYPUB_G5_USERNAME, $mb['mb_id'], "[발송실패] 수신자를 찾을 수 없음: @" . strip_tags($account));
                         break;
                     }
 
@@ -758,7 +953,7 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
         }
 
         // 엑세스 토큰(Access Token)이 존재하는 목적지인 경우
-        // 2026-09-16 보안 통신(HTTPS)을 우선하며, 비보안통신은 허용된 경우에만 시도
+        // 2026-09-16, 보안 통신(HTTPS)을 우선하며, 비보안통신(HTTP)은 허용된 경우에만 시도, KVE-2026-2202 권고 반영
         $access_token = '';
         $access_token_data = activitypub_parse_stored_data(ACTIVITYPUB_ACCESS_TOKEN);
         foreach ($access_token_data as $host => $token) {
@@ -1029,7 +1224,8 @@ function activitypub_verify_actor($actor_url) {
     if (empty($actor_url) || !is_string($actor_url)) {
         return array(
             "result" => false,
-            "error" => "Actor could not be empty"
+            "error" => "Actor could not be empty",
+            "actor" => null
         );
     }
 
@@ -1040,7 +1236,8 @@ function activitypub_verify_actor($actor_url) {
         empty($url_ctx['host'])) {
         return array(
             "result" => false,
-            "error" => "Invalid actor URL"
+            "error" => "Invalid actor URL",
+            "actor" => null
         );
     }
 
@@ -1054,7 +1251,8 @@ function activitypub_verify_actor($actor_url) {
         if (!ACTIVITYPUB_ALLOW_INSECURE_SCHEME) {
             return array(
                 "result" => false,
-                "error" => "Insecure actor URL is not allowed"
+                "error" => "Insecure actor URL is not allowed",
+                "actor" => null
             );
         }
     }
@@ -1063,7 +1261,8 @@ function activitypub_verify_actor($actor_url) {
     else {
         return array(
             "result" => false,
-            "error" => "Invalid actor URL scheme"
+            "error" => "Invalid actor URL scheme",
+            "actor" => null
         );
     }
 
@@ -1073,7 +1272,8 @@ function activitypub_verify_actor($actor_url) {
     if (!is_array($actor)) {
         return array(
             "result" => false,
-            "error" => "Could not retrieve actor"
+            "error" => "Could not retrieve actor",
+            "actor" => null
         );
     }
 
@@ -1082,15 +1282,19 @@ function activitypub_verify_actor($actor_url) {
         $actor['id'] !== $actor_url) {
         return array(
             "result" => false,
-            "error" => "Actor ID does not match"
+            "error" => "Actor ID does not match",
+            "actor" => null
         );
     }
 
     return array(
         "result" => true,
-        "error" => ""
+        "error" => "",
+        "actor" => $actor
     );
 }
+
+
 
 class _GNUBOARD_ActivityPub {
     public static function open() {
@@ -1231,7 +1435,8 @@ class _GNUBOARD_ActivityPub {
             case "POST":
                 // 개인에게 보낸 메시지는 쪽지에 저장
                 // 공개(Public) 설정한 메시지는 ACTIVITYPUB_G5_TABLENAME에 저장
-                $data = activitypub_json_decode(file_get_contents("php://input"), true);
+                $rawdata = file_get_contents("php://input"); // 2026-09-25, $rawdata 변수 분리 (검증 절차에 사용)
+                $data = activitypub_json_decode($rawdata, true);
 
                 // @context의 네임스페이스는 단수형(string으로 표현) 또는 복수형(array로 표현)될 수 있음
                 $namespaces = activitypub_cast_to_array($data['@context']);
@@ -1241,11 +1446,34 @@ class _GNUBOARD_ActivityPub {
                     return activitypub_json_encode(array("message" => "This is not an ActivityStreams request"));
                 }
                 
-                // 행위자(actor) 검증을 시도하고 검증에 실패하면 요청 거절, KVE-2026-2199 권고 반영
+                // 2026-09-25, 행위자(actor) 검증을 시도하고 검증에 실패하면 요청 거절, KVE-2026-2199 권고 반영
                 $actor_verification = activitypub_verify_actor($data['actor']);
                 if (!$actor_verification['result']) {
+					activitypub_add_memo(
+						ACTIVITYPUB_G5_USERNAME,
+						ACTIVITYPUB_G5_USERNAME,
+						"[ActivityPub 경고] 행위자(Actor) 검증 실패: " . strip_tags($data['actor']) .
+						"\r\n\r\n" .
+						"실패 사유: " . $actor_verification['error']
+					);
                     return activitypub_json_encode(array(
                         "message" => $actor_verification['error']
+                    ));
+                }
+                
+                // 2026-09-25, HTTP Signature 검증, KVE-2026-2199 권고 반영
+                $actor = $actor_verification['actor'];
+                $signature_verification = activitypub_verify_signature($actor, $rawdata);
+                if (!$signature_verification['result']) {
+					activitypub_add_memo(
+						ACTIVITYPUB_G5_USERNAME,
+						ACTIVITYPUB_G5_USERNAME,
+						"[ActivityPub 경고] HTTP 서명(Signature) 검증 실패: " . strip_tags($data['actor']) .
+						"\r\n\r\n" .
+						"실패 사유: " . $signature_verification['error']
+					);
+                    return activitypub_json_encode(array(
+                        "message" => $signature_verification['error']
                     ));
                 }
                 
