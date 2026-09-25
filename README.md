@@ -1,6 +1,12 @@
 # gnuboard5-activitypub
 [![Discord chat](https://img.shields.io/discord/359930650330923008?logo=discord)](https://discord.gg/dBE65JgcBW)
 
+> ***보안 공지***
+> 
+> GNUBOARD5-ActivityPub 은 KISA(한국인터넷진흥원)에서 2건의 보안 권고(KVE-2026-2199, KVE-2026-2202)를 받았습니다.
+> 
+> 이에, 2026-09-25 부터 해당 보안 권고를 반영한 버전 0.1.19가 배포되고 있는 점 참고하여 주시기 바랍니다.
+
 GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 
 * https://sir.kr/g5_plugin/10381
