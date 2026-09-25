@@ -7,6 +7,10 @@
 > 
 > 이에, 2026-09-25 부터 해당 보안 권고를 반영한 버전 [0.1.19](https://github.com/gnh1201/gnuboard5-activitypub/releases/tag/0.1.19)가 배포되고 있는 점 참고하여 주시기 바랍니다.
 
+> ***테스트 웹사이트***
+> 
+> https://catswords.iwinv.net/
+
 GNUBOARD5-ActivityPub: ActivityPub (Fediverse) implementation for GNUBOARD5
 
 * https://sir.kr/g5_plugin/10381
