@@ -22,13 +22,13 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://chat.openai.com/share/4fda7974-cc0b-439a-b0f2-dc828f8acfef
 //   * https://codeberg.org/mro/activitypub/src/commit/4b1319d5363f4a836f23c784ef780b81bc674013/like.sh#L101
 //   * https://socialhub.activitypub.rocks/t/problems-posting-to-mastodon-inbox/801/10
-
+// 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.19-dev");
 define("ACTIVITYPUB_DEFAULT_SCHEME", "https");    // 외부 통신용 스킴 (SSL 사용이 기본)
-define("ACTIVITYPUB_INSECURE_SCHEME", "http");
+define("ACTIVITYPUB_INSECURE_SCHEME", "http");  // 예외적 비암호화 스킴 (ACTIVITYPUB_ALLOW_INSECURE_SCHEME 반드시 확인 후 사용)
 define("ACTIVITYPUB_ALLOW_INSECURE_SCHEME", false);  // 비암호화 통신 지원 (운영환경에서 활성화 금지)
-define("ACTIVITYPUB_ALLOW_MISSING_SIGNATURE", false);  // 2026-09-25, HTTP 서명(Signature) 검증 여부 (웹호스팅 등 미지원 환경에선 true), KVE-2026-2202 권고 반영
+define("ACTIVITYPUB_ALLOW_MISSING_SIGNATURE", false);  // 2026-09-25, HTTP 서명(Signature) 검증 여부 (웹호스팅 등 미지원 환경에선 true로 조정), KVE-2026-2202 권고 반영
 define("ACTIVITYPUB_HOST", (empty(G5_HTTPS_DOMAIN) ? $_SERVER['HTTP_HOST'] : substr(G5_HTTPS_DOMAIN, strlen(ACTIVITYPUB_DEFAULT_SCHEME) + 3))); // 2026-09-25, 잠재적 버그 픽스
 define("ACTIVITYPUB_URL", (empty(G5_URL) ? ACTIVITYPUB_DEFAULT_SCHEME . "://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
@@ -40,7 +40,6 @@ define("ACTIVITYPUB_G5_EXPIRED_DAYS", (empty($config['cf_memo_del']) ? 180 : $co
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=YOUR_ACCESS_TOKEN; server2.example.org=YOUR_ACCESS_TOKEN;");
 define("ACTIVITYPUB_CERTIFICATE_RETRY", 10);    // 최대 인증서 생성 시도 횟수
 define("ACTIVITYPUB_CERTIFICATE_DATAFIELD", "mb_9");    // 회원별 인증서(공개키, 개인키)를 저장할 필드 (기본: mb_9)
-define("OAUTH2_GRANT_DATAFIELD", "mb_10");    // 회원별 인증 정보를 저장할 필드 (기본: mb_10)
 define("DEFAULT_HTML_ENTITY_FLAGS", ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
 define("DEFAULT_SSL_VERIFYPEER", true);   // 2026-09-15, 보안통신(SSL) 검증 강제, KVE-2026-2202 권고 반영
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
