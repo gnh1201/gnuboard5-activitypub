@@ -40,6 +40,7 @@ define("ACTIVITYPUB_G5_EXPIRED_DAYS", (empty($config['cf_memo_del']) ? 180 : $co
 define("ACTIVITYPUB_ACCESS_TOKEN", "server1.example.org=YOUR_ACCESS_TOKEN; server2.example.org=YOUR_ACCESS_TOKEN;");
 define("ACTIVITYPUB_CERTIFICATE_RETRY", 10);    // 최대 인증서 생성 시도 횟수
 define("ACTIVITYPUB_CERTIFICATE_DATAFIELD", "mb_9");    // 회원별 인증서(공개키, 개인키)를 저장할 필드 (기본: mb_9)
+define("ACTIVITYPUB_ALLOWED_REMOTE_DOMAINS", "*");  // 2026-09-25, 액티비티 발송을 허용할 도메인 (쉼표로 구분), KVE-2026-2202 권고 반영
 define("DEFAULT_HTML_ENTITY_FLAGS", ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
 define("DEFAULT_SSL_VERIFYPEER", true);   // 2026-09-15, 보안통신(SSL) 검증 강제, KVE-2026-2202 권고 반영
 define("NAMESPACE_ACTIVITYSTREAMS", "https://www.w3.org/ns/activitystreams");
@@ -666,6 +667,15 @@ function activitypub_get_attachments($bo_table, $wr_id) {
 }
 
 function activitypub_http_post($url, $rawdata, $mb, $access_token = '') {
+	// 2026-09-25, 요청 도메인 검증, KVE-2026-2202 권고 반영
+    if (!activitypub_is_allowed_remote_url($url)) {
+        activitypub_add_memo(
+            ACTIVITYPUB_G5_USERNAME,
+            $mb['mb_id'],
+            "[ActivityPub 경고] 요청한 도메인은 이 작업이 허용되지 않았음: " . $url
+        );
+    }
+    
     // get digest
     $date = activitypub_build_datetime('now');
     $digest = activitypub_build_digest($rawdata);
@@ -967,8 +977,8 @@ function activitypub_publish_content($content, $object_id, $mb, $_added_object =
             );
             continue;
         }
-
-        // 2026-09-16 보안 통신을 지원하지 않는 inbox는 건너뛰기
+        
+        // 2026-09-16, 보안 통신을 지원하지 않는 inbox는 건너뛰기, KVE-2026-2202 권고 반영
         if (parse_url($remote_inbox_url, PHP_URL_SCHEME) !== ACTIVITYPUB_DEFAULT_SCHEME && !ACTIVITYPUB_ALLOW_INSECURE_SCHEME) {
             activitypub_add_memo(
                 ACTIVITYPUB_G5_USERNAME,
@@ -1318,6 +1328,57 @@ function activitypub_verify_actor($actor_url) {
         "error" => "",
         "actor" => $actor
     );
+}
+
+// 2026-09-25, 액티비티 발송을 허용할 도메인 검증, KVE-2026-2202 권고 반영
+function activitypub_is_allowed_remote_url($url) {
+    $allowed = defined("ACTIVITYPUB_ALLOWED_REMOTE_DOMAINS")
+        ? trim(ACTIVITYPUB_ALLOWED_REMOTE_DOMAINS)
+        : "";
+
+    // Not configured or "*" means allow all
+    if ($allowed === "" || $allowed === "*") {
+        return true;
+    }
+
+    $parsed = parse_url($url);
+
+    if (!$parsed || empty($parsed["host"])) {
+        return false;
+    }
+
+    $host = strtolower(rtrim($parsed["host"], "."));
+    $domains = explode(",", $allowed);
+
+    foreach ($domains as $domain) {
+        $domain = strtolower(trim($domain));
+
+        if ($domain === "" || $domain === "*") {
+            return true;
+        }
+
+        // Wildcard: *.example.org
+        if (substr($domain, 0, 2) === "*.") {
+            $base_domain = rtrim(substr($domain, 2), ".");
+
+            if (
+                $host !== $base_domain &&
+                substr($host, -(strlen($base_domain) + 1)) === "." . $base_domain
+            ) {
+                return true;
+            }
+        }
+        // Exact domain
+        else {
+            $domain = rtrim($domain, ".");
+
+            if ($host === $domain) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 class _GNUBOARD_ActivityPub {
