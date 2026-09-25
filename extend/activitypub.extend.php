@@ -853,16 +853,17 @@ function activitypub_update_activity($inbox = "inbox", $data, $mb = array("mb_id
             $wr_option = 'secret';
 
         // 게시글로 등록
+        // 2026-09-25, 행위자(actor) 등록 시 SQL 인젝션 방지, KVE-2026-2199 권고 반영
         $wr_num = get_next_num($write_table);
         $wr_reply = '';
         $ca_name = $inbox;    // Inbox/Outbox
-        $wr_subject = mb_substr(strip_tags($content), 0, 50);
-        $wr_seo_title = strip_tags($content);
-        $wr_content = strip_tags($content) . "\r\n\r\n[외부에서 전송된 글입니다.]";
-        $wr_link1 = $data['actor'];
+        $wr_subject = sql_escape_string(mb_substr(strip_tags($content), 0, 50));
+        $wr_seo_title = sql_escape_string(strip_tags($content));
+        $wr_content = sql_escape_string(strip_tags(strip_tags($content))) . "\r\n\r\n[외부에서 전송된 글입니다.]";
+        $wr_link1 = sql_escape_string($data['actor']);
         $wr_link2 = '';
-        $wr_homepage = $data['actor'];
-        $wr_6 = $data['type'];    // Type of Activity
+        $wr_homepage = sql_escape_string($data['actor']);
+        $wr_6 = sql_escape_string($data['type']);    // Type of Activity
 
         // 수신자 확인
         $receivers = array();
@@ -1023,6 +1024,74 @@ function activitypub_build_collection($items, $summary = '') {
     );
 }
 
+// 2026-09-25, 행위자(actor) 검증, KVE-2026-2199 권고 반영
+function activitypub_verify_actor($actor_url) {
+    if (empty($actor_url) || !is_string($actor_url)) {
+        return array(
+            "result" => false,
+            "error" => "Actor could not be empty"
+        );
+    }
+
+    // Actor URL 파싱
+    $url_ctx = parse_url($actor_url);
+
+    if (empty($url_ctx['scheme']) ||
+        empty($url_ctx['host'])) {
+        return array(
+            "result" => false,
+            "error" => "Invalid actor URL"
+        );
+    }
+
+    // HTTPS는 항상 허용
+    if ($url_ctx['scheme'] === ACTIVITYPUB_DEFAULT_SCHEME) {
+        // 허용
+    }
+
+    // HTTP는 명시적으로 허용된 경우에만 허용
+    else if ($url_ctx['scheme'] === ACTIVITYPUB_INSECURE_SCHEME) {
+        if (!ACTIVITYPUB_ALLOW_INSECURE_SCHEME) {
+            return array(
+                "result" => false,
+                "error" => "Insecure actor URL is not allowed"
+            );
+        }
+    }
+
+    // 지원하지 않는 Scheme은 거부
+    else {
+        return array(
+            "result" => false,
+            "error" => "Invalid actor URL scheme"
+        );
+    }
+
+    // Actor 정보 조회
+    $actor = activitypub_http_get($actor_url);
+
+    if (!is_array($actor)) {
+        return array(
+            "result" => false,
+            "error" => "Could not retrieve actor"
+        );
+    }
+
+    // 조회한 Actor의 ID가 요청한 Actor URL과 일치하는지 확인
+    if (empty($actor['id']) ||
+        $actor['id'] !== $actor_url) {
+        return array(
+            "result" => false,
+            "error" => "Actor ID does not match"
+        );
+    }
+
+    return array(
+        "result" => true,
+        "error" => ""
+    );
+}
+
 class _GNUBOARD_ActivityPub {
     public static function open() {
         header("Content-Type: application/activity+json; profile=\"" . NAMESPACE_ACTIVITYSTREAMS . "\"");
@@ -1171,7 +1240,15 @@ class _GNUBOARD_ActivityPub {
                 if (!in_array(NAMESPACE_ACTIVITYSTREAMS, $namespaces)) {
                     return activitypub_json_encode(array("message" => "This is not an ActivityStreams request"));
                 }
-
+                
+                // 행위자(actor) 검증을 시도하고 검증에 실패하면 요청 거절, KVE-2026-2199 권고 반영
+                $actor_verification = activitypub_verify_actor($data['actor']);
+                if (!$actor_verification['result']) {
+                    return activitypub_json_encode(array(
+                        "message" => $actor_verification['error']
+                    ));
+                }
+                
                 // 컨텐츠 변수 정의
                 $content = '';
 
@@ -1207,7 +1284,7 @@ class _GNUBOARD_ActivityPub {
                             $bo = get_board_db(ACTIVITYPUB_G5_BOARDNAME, true);
                             $content = sprintf(
                                 "%s\r\n\r\n[외부에서 전송된 글입니다. 자세한 내용은 %s#%s 글을 확인하세요.]",
-                                strip_tags($object['content']),
+                                sql_escape_string(strip_tags($object['content'])), // 2026-09-25, KVE-2026-2199 권고 반영
                                 $bo['bo_subject'],
                                 $activity_wr_id
                             );
@@ -1226,7 +1303,7 @@ class _GNUBOARD_ActivityPub {
                                     // 글이 존재하는 경우
                                     if (!empty($wr['wr_id'])) {
                                         $mb = get_member(ACTIVITYPUB_G5_USERNAME);
-                                        $wr_homepage = $data['actor'];
+                                        $wr_homepage = sql_escape_string($data['actor']); // 2026-09-25, KVE-2026-2199 권고 반영
 
                                         $sql = "
                                             insert into $write_table
