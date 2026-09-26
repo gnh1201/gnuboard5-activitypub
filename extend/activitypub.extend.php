@@ -6,8 +6,8 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 // ActivityPub: @gnh1201@catswords.social
 // License: MIT
 // First released date: 2023-08-08
-// Last updated date: 2026-09-25
-// Version: 0.1.19
+// Last updated date: 2026-09-26
+// Version: 0.1.20
 // References:
 //   * https://www.w3.org/TR/activitypub/
 //   * https://www.w3.org/TR/activitystreams-core/
@@ -22,6 +22,7 @@ if (!defined('_GNUBOARD_')) exit; // 개별 페이지 접근 불가
 //   * https://chat.openai.com/share/4fda7974-cc0b-439a-b0f2-dc828f8acfef
 //   * https://codeberg.org/mro/activitypub/src/commit/4b1319d5363f4a836f23c784ef780b81bc674013/like.sh#L101
 //   * https://socialhub.activitypub.rocks/t/problems-posting-to-mastodon-inbox/801/10
+//   * KVE-2026-2199, KVE-2026-2202 KISA security advisory
 // 
 define("ACTIVITYPUB_INSTANCE_ID", md5_file(G5_DATA_PATH . "/dbconfig.php"));
 define("ACTIVITYPUB_INSTANCE_VERSION", "0.1.19");
@@ -33,7 +34,8 @@ define("ACTIVITYPUB_HOST", (empty(G5_HTTPS_DOMAIN) ? $_SERVER['HTTP_HOST'] : sub
 define("ACTIVITYPUB_URL", (empty(G5_URL) ? ACTIVITYPUB_DEFAULT_SCHEME . "://" . ACTIVITYPUB_INSTANCE_ID . ".local" : G5_URL));
 define("ACTIVITYPUB_DATA_URL", ACTIVITYPUB_URL . '/' . G5_DATA_DIR);
 define("ACTIVITYPUB_G5_BOARDNAME", "apstreams");
-define("ACTIVITYPUB_G5_TABLENAME", $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME);
+define("ACTIVITYPUB_G5_WRITEPREFIX", $g5['write_prefix']);
+define("ACTIVITYPUB_G5_TABLENAME", ACTIVITYPUB_G5_WRITEPREFIX . ACTIVITYPUB_G5_BOARDNAME);
 define("ACTIVITYPUB_G5_USERNAME", "apstreams");
 define("ACTIVITYPUB_G5_OUTDATED_DAYS", (empty($config['cf_new_del']) ? 30 : $config['cf_new_del']));
 define("ACTIVITYPUB_G5_EXPIRED_DAYS", (empty($config['cf_memo_del']) ? 180 : $config['cf_memo_del']));
@@ -250,7 +252,7 @@ function activitypub_get_user_interactions() {
     $sql = "select * from " . $g5['board_new_table']; 
     $result = sql_query($sql);
     while ($row = sql_fetch_array($result)) {
-        $sql2 = "select mb_id from " . ($g5['write_prefix'] . $row['bo_table']) . " where wr_id = '" . $row['wr_id'] . "'";
+        $sql2 = "select mb_id from " . (ACTIVITYPUB_G5_WRITEPREFIX . $row['bo_table']) . " where wr_id = '" . $row['wr_id'] . "'";
         $row2 = sql_fetch($sql2);
         if ($row2['mb_id']) {
             array_push($items, array("from" => $row['mb_id'], "to" => $row2['mb_id']));
@@ -261,7 +263,7 @@ function activitypub_get_user_interactions() {
     $sql = "select bo_table, wr_id, mb_id from {$g5['board_good_table']} where bg_flag = 'good'";
     $result = sql_query($sql);
     while ($row = sql_fetch_array($result)) {
-        $sql2 = "select mb_id from " . ($g5['write_prefix'] . $row['bo_table']) . " where wr_id = '" . $row['wr_id'] . "'";
+        $sql2 = "select mb_id from " . (ACTIVITYPUB_G5_WRITEPREFIX . $row['bo_table']) . " where wr_id = '" . $row['wr_id'] . "'";
         $row2 = sql_fetch($sql2);
         if ($row2['mb_id']) {
             array_push($items, array("from" => $row['mb_id'], "to" => $row2['mb_id']));
@@ -337,7 +339,7 @@ function activitypub_set_liked($good, $bo_table, $wr_id) {
     global $g5;
 
     // 추천(찬성), 비추천(반대) 카운트 증가
-    sql_query(" update {$g5['write_prefix']}{$bo_table} set wr_{$good} = wr_{$good} + 1 where wr_id = '{$wr_id}' ");
+    sql_query(" update {ACTIVITYPUB_G5_WRITEPREFIX}{$bo_table} set wr_{$good} = wr_{$good} + 1 where wr_id = '{$wr_id}' ");
 
     // 내역 생성
     sql_query(" insert {$g5['board_good_table']} set bo_table = '{$bo_table}', wr_id = '{$wr_id}', mb_id = '" . ACTIVITYPUB_G5_USERNAME . "', bg_flag = '{$good}', bg_datetime = '" . G5_TIME_YMDHIS . "' ");
@@ -667,7 +669,7 @@ function activitypub_get_attachments($bo_table, $wr_id) {
 }
 
 function activitypub_http_post($url, $rawdata, $mb, $access_token = '') {
-	// 2026-09-25, 요청 도메인 검증, KVE-2026-2202 권고 반영
+    // 2026-09-25, 요청 도메인 검증, KVE-2026-2202 권고 반영
     if (!activitypub_is_allowed_remote_url($url)) {
         activitypub_add_memo(
             ACTIVITYPUB_G5_USERNAME,
@@ -1211,7 +1213,7 @@ function activitypub_get_activity_by_id($activity_id) {
     $activity_ctx = array();
 
     // 해당 액티비티 찾고 없으면 빈 정보 반환
-    $write_table = $g5['write_prefix'] . ACTIVITYPUB_G5_BOARDNAME;
+    $write_table = ACTIVITYPUB_G5_WRITEPREFIX . ACTIVITYPUB_G5_BOARDNAME;
     $wr = get_write($write_table, $activity_id);
     if (empty($wr['wr_id'])) return $activity_ctx;
 
@@ -1588,10 +1590,13 @@ class _GNUBOARD_ActivityPub {
                             // 스트링 및 오브젝트 타입을 모두 호환하도록 설정
                             if (is_string($object))
                                 $object = array("id" => $object);
-
+                            
+                            // 원격지 호스트 추출
+                            $remote_host = activitypub_parse_url($actor['id'])['host'];
+                            
                             // 컨텐츠가 비어있는 경우
                             if (empty($object['content']))
-                                $object['content'] = "[NO CONTENT]";
+                                $object['content'] = "[No Content]";
 
                             // 수신된 내용 등록
                             $activity_wr_id = activitypub_update_activity("inbox", $data, $mb, "published");
@@ -1599,7 +1604,9 @@ class _GNUBOARD_ActivityPub {
                             // 컨텐츠 설정
                             $bo = get_board_db(ACTIVITYPUB_G5_BOARDNAME, true);
                             $content = sprintf(
-                                "%s\r\n\r\n[외부에서 전송된 글입니다. 자세한 내용은 %s#%s 글을 확인하세요.]",
+                                "발신자: %s (%s)\r\n\r\n%s\r\n\r\n[외부에서 전송된 글입니다. 자세한 내용은 %s#%s 글을 확인하세요.]",
+                                sql_escape_string(strip_tags($actor['name'])),
+                                ('@' . sql_escape_string(strip_tags($actor['preferredUsername'])) . '@' . $remote_host),
                                 sql_escape_string(strip_tags($object['content'])), // 2026-09-25, KVE-2026-2199 권고 반영
                                 $bo['bo_subject'],
                                 $activity_wr_id
@@ -1608,14 +1615,14 @@ class _GNUBOARD_ActivityPub {
                             // 답글인지 확인
                             if (!empty($object['inReplyTo'])) {
                                 // 답글 정보 확인
-                                $query = activitypub_parse_url($object['inReplyTo'])['query'];
+                                $reply_query = activitypub_parse_url($object['inReplyTo'])['query'];
 
                                 // 특정 글이 지목되어 있을 때 -> 댓글로 작성
-                                if (!empty($query['bo_table']) && !empty($query['wr_id'])) {
-                                    $wr_id = $query['wr_id'];
-                                    $write_table = $g5['write_prefix'] . $query['bo_table'];
+                                if (!empty($reply_query['bo_table']) && !empty($reply_query['wr_id'])) {
+                                    $wr_id = $reply_query['wr_id'];
+                                    $write_table = ACTIVITYPUB_G5_WRITEPREFIX . $reply_query['bo_table'];
                                     $wr = get_write($write_table, $wr_id);
-
+                                    
                                     // 글이 존재하는 경우
                                     if (!empty($wr['wr_id'])) {
                                         $mb = get_member(ACTIVITYPUB_G5_USERNAME);
@@ -1657,7 +1664,11 @@ class _GNUBOARD_ActivityPub {
 
                                     // 원글이 삭제된 경우
                                     else {
-                                        return activitypub_json_encode(array("message" => "Could not find the original message"));
+                                        activitypub_add_memo(
+                                            ACTIVITYPUB_G5_USERNAME,
+                                            ACTIVITYPUB_G5_USERNAME,
+                                            "[ActivityPub 경고] 이 요청이 지정한 원글을 찾을 수 없음: \r\n\r\n" . strip_tags($object['inReplyTo'])
+                                        );
                                     }
                                 }
                             }
@@ -1838,7 +1849,7 @@ class _GNUBOARD_ActivityPub {
         $sql = "select * from " . $g5['board_new_table']; 
         $result = sql_query($sql);
         while ($row = sql_fetch_array($result)) {
-            $write_table = $g5['write_prefix'] . $row['bo_table'];
+            $write_table = ACTIVITYPUB_G5_WRITEPREFIX . $row['bo_table'];
             $sql2 = "select wr_id, mb_id, wr_content, wr_datetime from {$write_table} where wr_id = '{$row['wr_id']}' and FIND_IN_SET('secret', wr_option) = 0 ";
             $row2 = sql_fetch($sql2);
             if ($row2['wr_id']) {
@@ -1901,7 +1912,7 @@ function _activitypub_write_update_after($board, $wr_id, $w, $qstr, $redirect_ur
     global $g5, $member;
 
     // 본문 가져오기 (본문이 없는 경우 중단)
-    $sql = "select wr_id, wr_content from {$g5['write_prefix']}{$board['bo_table']} where wr_id = '{$wr_id}'";
+    $sql = "select wr_id, wr_content from {ACTIVITYPUB_G5_WRITEPREFIX}{$board['bo_table']} where wr_id = '{$wr_id}'";
     $row = sql_fetch($sql);
     if (empty($row['wr_id'])) return;
 
@@ -1932,7 +1943,7 @@ function _activitypub_comment_update_after($board, $wr_id, $w, $qstr, $redirect_
     global $g5, $member;
 
     // 본문(댓글) 가져오기 (본문이 없는 경우 중단)
-    $sql = "select wr_id, wr_content from {$g5['write_prefix']}{$board['bo_table']} where wr_id = '{$wr_id}'";
+    $sql = "select wr_id, wr_content from {ACTIVITYPUB_G5_WRITEPREFIX}{$board['bo_table']} where wr_id = '{$wr_id}'";
     $row = sql_fetch($sql);
     if (empty($row['wr_id'])) return;
 
