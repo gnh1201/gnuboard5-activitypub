@@ -1,9 +1,9 @@
-# gnuboard5-activitypub
+# gnuboard5-activitypub (G5.ActivityPub)
 [![Discord chat](https://img.shields.io/discord/359930650330923008?logo=discord)](https://discord.gg/dBE65JgcBW)
 
 > ***보안 공지***
 > 
-> GNUBOARD5-ActivityPub 플러그인은 KISA(한국인터넷진흥원)에서 2건의 [보안 권고](https://github.com/gnh1201/gnuboard5-activitypub/issues/10)(KVE-2026-2199, KVE-2026-2202)를 받았습니다.
+> GNUBOARD5-ActivityPub (G5.ActivityPub) 플러그인은 KISA(한국인터넷진흥원)에서 2건의 [보안 권고](https://github.com/gnh1201/gnuboard5-activitypub/issues/10)(KVE-2026-2199, KVE-2026-2202)를 받았습니다.
 > 
 > 이에, 2026-09-25 부터 해당 보안 권고를 반영한 버전 [0.1.19](https://github.com/gnh1201/gnuboard5-activitypub/releases/tag/0.1.19)가 배포되고 있는 점 참고하여 주시기 바랍니다.
 
