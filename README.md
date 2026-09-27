@@ -13,7 +13,7 @@
 > 
 > https://catswords.iwinv.net/ (2026-09-26 기준 접속 가능)
 
-G5.ActivityPubL ActivityPub (Fediverse) extension for GNUBOARD5
+G5.ActivityPub: ActivityPub (Fediverse) extension for GNUBOARD5
 
 * https://sir.kr/g5_plugin/10381
 * https://codeberg.org/fediverse/delightful-activitypub-development
