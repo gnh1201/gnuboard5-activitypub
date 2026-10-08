@@ -142,7 +142,7 @@ G5.ActivityPub: ActivityPub (Fediverse) extension for GNUBOARD5
 * https://socialhub.activitypub.rocks/t/problems-posting-to-mastodon-inbox/801/10
 
 ## 라이선스 및 등록사항
-* 라이선스: MIT (오픈소스 라이선스)
+* 오픈소스 라이선스: MIT
 * 컴퓨터프로그램저작물 저작권 등록 (한국저작권위원회): 제C-2026-049843호
 
 ## 문의
