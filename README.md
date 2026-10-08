@@ -141,8 +141,11 @@ G5.ActivityPub: ActivityPub (Fediverse) extension for GNUBOARD5
 * https://codeberg.org/mro/activitypub/src/commit/4b1319d5363f4a836f23c784ef780b81bc674013/like.sh#L101
 * https://socialhub.activitypub.rocks/t/problems-posting-to-mastodon-inbox/801/10
 
+## 라이선스 및 등록사항
+* 라이선스: MIT (오픈소스 라이선스)
+* 컴퓨터프로그램저작물 저작권 등록 (한국저작권위원회): 제C-2026-049843호
+
 ## 문의
 * oss@catswords.re.kr
 * ActivityPub [@gnh1201@catswords.social](https://catswords.social/@gnh1201)
-* [Microsoft Teams에서 Catswords OSS 가입](https://teams.live.com/l/community/FEACHncAhq8ldnojAI)
 * [Discord에서 Catswords OSS #gnuboard5-activitypub 가입](https://discord.gg/dBE65JgcBW)
